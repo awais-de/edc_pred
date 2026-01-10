@@ -1,1 +1,16 @@
-# Add Python package requirements here (pytorch, pytorch-lightning, numpy, etc.)
+flask
+torch
+pytorch-lightning
+numpy
+pandas
+scikit-learn
+matplotlib
+soundfile
+joblib
+tqdm
+tensorboard
+hydra-core
+omegaconf
+pyroomacoustics
+librosa
+scipy
