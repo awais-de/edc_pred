@@ -248,31 +248,39 @@ def main():
     joblib.dump(scaler_X, os.path.join(output_dir, "scaler_X.pkl"))
     joblib.dump(scaler_y, os.path.join(output_dir, "scaler_y.pkl"))
     
+    # Convert metrics to native Python types for JSON serialization
+    metrics_serializable = {}
+    for key, value in metrics.items():
+        if isinstance(value, (np.integer, np.floating)):
+            metrics_serializable[key] = float(value)
+        else:
+            metrics_serializable[key] = value
+    
     # Save metadata
     metadata = {
         "model_name": args.model,
         "model_parameters": {
-            "total": total_params,
-            "trainable": trainable_params
+            "total": int(total_params),
+            "trainable": int(trainable_params)
         },
         "training_config": {
-            "max_epochs": args.max_epochs,
-            "batch_size": args.batch_size,
-            "learning_rate": args.learning_rate,
-            "actual_epochs": trainer.current_epoch + 1,
-            "training_duration_seconds": train_duration
+            "max_epochs": int(args.max_epochs),
+            "batch_size": int(args.batch_size),
+            "learning_rate": float(args.learning_rate),
+            "actual_epochs": int(trainer.current_epoch + 1),
+            "training_duration_seconds": float(train_duration)
         },
         "data_config": {
-            "num_samples": args.max_samples,
-            "input_dim": room_features.shape[1],
-            "output_length": edc_data.shape[1],
-            "train_size": len(train_loader.dataset),
-            "val_size": len(val_loader.dataset),
-            "test_size": len(test_loader.dataset)
+            "num_samples": int(args.max_samples),
+            "input_dim": int(room_features.shape[1]),
+            "output_length": int(edc_data.shape[1]),
+            "train_size": int(len(train_loader.dataset)),
+            "val_size": int(len(val_loader.dataset)),
+            "test_size": int(len(test_loader.dataset))
         },
-        "metrics": metrics,
+        "metrics": metrics_serializable,
         "timestamp": timestamp,
-        "best_model_path": checkpoint.best_model_path
+        "best_model_path": str(checkpoint.best_model_path)
     }
     
     with open(os.path.join(output_dir, "metadata.json"), "w") as f:
