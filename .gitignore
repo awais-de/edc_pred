@@ -12,6 +12,7 @@ experiments/lstm_*/
 experiments/hybrid_v1_*/
 experiments/hybrid_v2_*/
 experiments/hybrid_v3_*/
+experiments/transformer_*/
 
 # Keep structure directories empty
 !experiments/checkpoints/.gitkeep
