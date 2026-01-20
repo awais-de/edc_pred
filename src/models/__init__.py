@@ -5,6 +5,7 @@ Model registry for easy instantiation and switching.
 from typing import Dict, Type
 from .lstm_model import LSTMModel
 from .hybrid_models import CNNLSTMHybridV1, CNNLSTMHybridV2, CNNLSTMHybridV3
+from .transformer_model import TransformerModel
 
 
 MODEL_REGISTRY: Dict[str, Type] = {
@@ -12,6 +13,7 @@ MODEL_REGISTRY: Dict[str, Type] = {
     "hybrid_v1": CNNLSTMHybridV1,
     "hybrid_v2": CNNLSTMHybridV2,
     "hybrid_v3": CNNLSTMHybridV3,
+    "transformer": TransformerModel,
 }
 
 
