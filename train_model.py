@@ -69,6 +69,19 @@ def parse_arguments():
         choices=["auto", "cpu", "cuda"],
         help="Device to use for training"
     )
+    parser.add_argument(
+        "--loss-type", type=str, default="mse",
+        choices=["mse", "edc_rir"],
+        help="Loss function type: mse (MSE) or edc_rir (EDC+RIR weighted loss)"
+    )
+    parser.add_argument(
+        "--train-ratio", type=float, default=0.6,
+        help="Proportion of data for training"
+    )
+    parser.add_argument(
+        "--val-ratio", type=float, default=0.2,
+        help="Proportion of data for validation"
+    )
     
     return parser.parse_args()
 
@@ -123,8 +136,8 @@ def main():
     train_loader, val_loader, test_loader = create_dataloaders(
         X_scaled, y_scaled,
         batch_size=args.batch_size,
-        train_ratio=0.6,
-        val_ratio=0.2,
+        train_ratio=args.train_ratio,
+        val_ratio=args.val_ratio,
         input_reshape=True
     )
     
@@ -140,7 +153,7 @@ def main():
         "input_dim": room_features.shape[1],
         "target_length": edc_data.shape[1],
         "learning_rate": args.learning_rate,
-        "loss_type": "mse"
+        "loss_type": args.loss_type
     }
     
     # Add architecture-specific parameters
