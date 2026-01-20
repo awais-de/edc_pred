@@ -115,29 +115,42 @@ def evaluate_model(
             t20s_pred.append(params_pred["t20"])
             c50s_pred.append(params_pred["c50"])
         
-        # Filter out NaN values
-        edts_true = np.array([x for x in edts_true if not np.isnan(x)])
-        edts_pred = np.array([x for x in edts_pred if not np.isnan(x)])
-        t20s_true = np.array([x for x in t20s_true if not np.isnan(x)])
-        t20s_pred = np.array([x for x in t20s_pred if not np.isnan(x)])
-        c50s_true = np.array([x for x in c50s_true if not np.isnan(x)])
-        c50s_pred = np.array([x for x in c50s_pred if not np.isnan(x)])
+        # Convert to arrays
+        edts_true = np.array(edts_true)
+        edts_pred = np.array(edts_pred)
+        t20s_true = np.array(t20s_true)
+        t20s_pred = np.array(t20s_pred)
+        c50s_true = np.array(c50s_true)
+        c50s_pred = np.array(c50s_pred)
+        
+        # Filter out NaN values - keep matched pairs only
+        edt_valid = ~(np.isnan(edts_true) | np.isnan(edts_pred))
+        edts_true_valid = edts_true[edt_valid]
+        edts_pred_valid = edts_pred[edt_valid]
+        
+        t20_valid = ~(np.isnan(t20s_true) | np.isnan(t20s_pred))
+        t20s_true_valid = t20s_true[t20_valid]
+        t20s_pred_valid = t20s_pred[t20_valid]
+        
+        c50_valid = ~(np.isnan(c50s_true) | np.isnan(c50s_pred))
+        c50s_true_valid = c50s_true[c50_valid]
+        c50s_pred_valid = c50s_pred[c50_valid]
         
         # Add acoustic metrics
-        if len(edts_true) > 0:
-            metrics["edt_mae"] = mean_absolute_error(edts_true, edts_pred)
-            metrics["edt_rmse"] = np.sqrt(mean_squared_error(edts_true, edts_pred))
-            metrics["edt_r2"] = r2_score(edts_true, edts_pred)
+        if len(edts_true_valid) > 0:
+            metrics["edt_mae"] = mean_absolute_error(edts_true_valid, edts_pred_valid)
+            metrics["edt_rmse"] = np.sqrt(mean_squared_error(edts_true_valid, edts_pred_valid))
+            metrics["edt_r2"] = r2_score(edts_true_valid, edts_pred_valid)
         
-        if len(t20s_true) > 0:
-            metrics["t20_mae"] = mean_absolute_error(t20s_true, t20s_pred)
-            metrics["t20_rmse"] = np.sqrt(mean_squared_error(t20s_true, t20s_pred))
-            metrics["t20_r2"] = r2_score(t20s_true, t20s_pred)
+        if len(t20s_true_valid) > 0:
+            metrics["t20_mae"] = mean_absolute_error(t20s_true_valid, t20s_pred_valid)
+            metrics["t20_rmse"] = np.sqrt(mean_squared_error(t20s_true_valid, t20s_pred_valid))
+            metrics["t20_r2"] = r2_score(t20s_true_valid, t20s_pred_valid)
         
-        if len(c50s_true) > 0:
-            metrics["c50_mae"] = mean_absolute_error(c50s_true, c50s_pred)
-            metrics["c50_rmse"] = np.sqrt(mean_squared_error(c50s_true, c50s_pred))
-            metrics["c50_r2"] = r2_score(c50s_true, c50s_pred)
+        if len(c50s_true_valid) > 0:
+            metrics["c50_mae"] = mean_absolute_error(c50s_true_valid, c50s_pred_valid)
+            metrics["c50_rmse"] = np.sqrt(mean_squared_error(c50s_true_valid, c50s_pred_valid))
+            metrics["c50_r2"] = r2_score(c50s_true_valid, c50s_pred_valid)
     
     return metrics
 
