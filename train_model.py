@@ -97,12 +97,16 @@ def main():
         max_files=args.max_samples,
         verbose=True
     )
-    
     room_features = load_room_features(
         args.features_path,
         max_samples=args.max_samples
     )
-    
+
+    # Align counts in case features < EDCs (or vice versa)
+    n_samples = min(len(edc_data), len(room_features))
+    edc_data = edc_data[:n_samples]
+    room_features = room_features[:n_samples]
+
     print(f"✓ Loaded {len(edc_data)} EDC samples in {time.time()-start_time:.2f}s")
     print(f"  EDC shape: {edc_data.shape}")
     print(f"  Features shape: {room_features.shape}\n")
