@@ -4,7 +4,7 @@ CNN-LSTM Hybrid models for EDC prediction.
 
 import torch
 import torch.nn as nn
-from .lstm_model import EDCRIRLoss
+from .lstm_model import EDCRIRLoss, WeightedEDCLoss
 from .base_model import BaseEDCModel
 
 
@@ -83,6 +83,14 @@ class CNNLSTMHybridV1(BaseEDCModel):
             self.criterion = nn.MSELoss()
         elif self.loss_type == "edc_rir":
             self.criterion = EDCRIRLoss(alpha=1.0, beta=0.5)
+        elif self.loss_type == "weighted_edc":
+            self.criterion = WeightedEDCLoss(
+                sampling_rate=48000,
+                edt_weight=2.0,
+                t20_weight=3.0,
+                c50_weight=3.0,
+                base_weight=1.0
+            )
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     
@@ -199,7 +207,16 @@ class CNNLSTMHybridV2(BaseEDCModel):
             self.criterion = nn.MSELoss()
         elif self.loss_type == "edc_rir":
             self.criterion = EDCRIRLoss(alpha=1.0, beta=0.5)
+        elif self.loss_type == "weighted_edc":
+            self.criterion = WeightedEDCLoss(
+                sampling_rate=48000,
+                edt_weight=2.0,
+                t20_weight=3.0,
+                c50_weight=3.0,
+                base_weight=1.0
+            )
         else:
+            raise ValueError(f"Unknown loss type: {self.loss_type}")
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -304,6 +321,14 @@ class CNNLSTMHybridV3(BaseEDCModel):
             self.criterion = nn.MSELoss()
         elif self.loss_type == "edc_rir":
             self.criterion = EDCRIRLoss(alpha=1.0, beta=0.5)
+        elif self.loss_type == "weighted_edc":
+            self.criterion = WeightedEDCLoss(
+                sampling_rate=48000,
+                edt_weight=2.0,
+                t20_weight=3.0,
+                c50_weight=3.0,
+                base_weight=1.0
+            )
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     

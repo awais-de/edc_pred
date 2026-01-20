@@ -59,6 +59,14 @@ class LSTMModel(BaseEDCModel):
             self.criterion = nn.MSELoss()
         elif self.loss_type == "edc_rir":
             self.criterion = EDCRIRLoss(alpha=1.0, beta=0.5)
+        elif self.loss_type == "weighted_edc":
+            self.criterion = WeightedEDCLoss(
+                sampling_rate=48000,
+                edt_weight=2.0,
+                t20_weight=3.0,
+                c50_weight=3.0,
+                base_weight=1.0
+            )
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     
@@ -131,3 +139,87 @@ class EDCRIRLoss(nn.Module):
         if return_components:
             return total, edc_loss, rir_loss
         return total
+
+
+class WeightedEDCLoss(nn.Module):
+    """
+    Region-weighted EDC loss that emphasizes T20 and C50 critical zones.
+    
+    Weights different EDC regions based on their importance for acoustic parameters:
+    - EDT region (0 to -10dB): Weight 2.0
+    - T20 region (-5dB to -25dB): Weight 3.0 (most critical)
+    - C50 early region (first 50ms): Weight 3.0 (most critical)
+    - Late decay: Weight 1.0 (baseline)
+    """
+    
+    def __init__(
+        self, 
+        sampling_rate: int = 48000,
+        edt_weight: float = 2.0,
+        t20_weight: float = 3.0,
+        c50_weight: float = 3.0,
+        base_weight: float = 1.0
+    ):
+        """
+        Initialize weighted loss.
+        
+        Args:
+            sampling_rate: Sampling rate of EDC (default 48kHz)
+            edt_weight: Weight for EDT region (0 to -10dB)
+            t20_weight: Weight for T20 region (-5dB to -25dB)
+            c50_weight: Weight for C50 early region (first 50ms)
+            base_weight: Weight for remaining regions
+        """
+        super().__init__()
+        self.sampling_rate = sampling_rate
+        self.edt_weight = edt_weight
+        self.t20_weight = t20_weight
+        self.c50_weight = c50_weight
+        self.base_weight = base_weight
+    
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        """
+        Compute weighted loss.
+        
+        Args:
+            y_pred: Predicted EDC (batch_size, seq_len) in linear scale
+            y_true: Ground truth EDC (batch_size, seq_len) in linear scale
+            
+        Returns:
+            Weighted MSE loss
+        """
+        batch_size, seq_len = y_pred.shape
+        
+        # Convert to dB scale for zone identification (add small epsilon to avoid log(0))
+        eps = 1e-10
+        y_true_db = 10 * torch.log10(y_true + eps)
+        
+        # Normalize to 0dB at peak
+        y_true_db = y_true_db - y_true_db.max(dim=1, keepdim=True)[0]
+        
+        # Initialize weight mask with base weight
+        weight_mask = torch.ones_like(y_pred) * self.base_weight
+        
+        # C50 region: First 50ms (critical for clarity)
+        c50_samples = int(0.050 * self.sampling_rate)  # 50ms
+        if c50_samples < seq_len:
+            weight_mask[:, :c50_samples] = self.c50_weight
+        
+        # EDT region: 0 to -10dB
+        edt_mask = (y_true_db >= -10.0)
+        weight_mask[edt_mask] = torch.maximum(weight_mask[edt_mask], 
+                                               torch.tensor(self.edt_weight).to(weight_mask.device))
+        
+        # T20 region: -5dB to -25dB (most critical for reverberation time)
+        t20_mask = (y_true_db >= -25.0) & (y_true_db <= -5.0)
+        weight_mask[t20_mask] = torch.maximum(weight_mask[t20_mask], 
+                                               torch.tensor(self.t20_weight).to(weight_mask.device))
+        
+        # Compute weighted MSE
+        squared_error = (y_pred - y_true) ** 2
+        weighted_error = squared_error * weight_mask
+        
+        # Mean over all elements
+        loss = weighted_error.mean()
+        
+        return loss
