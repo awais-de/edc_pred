@@ -140,7 +140,14 @@ def main():
     }
     
     # Add architecture-specific parameters
-    if "hybrid" in args.model:
+    if "hybrid_v3" in args.model:
+        # hybrid_v3 doesn't take cnn_filters/cnn_kernel_sizes
+        model_kwargs.update({
+            "lstm_hidden_dim": 128,
+            "fc_hidden_dim": 2048,
+            "dropout_rate": 0.3
+        })
+    elif "hybrid" in args.model:
         model_kwargs.update({
             "cnn_filters": [32, 64],
             "cnn_kernel_sizes": [3, 3],

@@ -218,8 +218,9 @@ class CNNLSTMHybridV2(BaseEDCModel):
         cnn_out = cnn_out.view(cnn_out.shape[0], -1)  # shape: (batch_size, channels)
         cnn_out = torch.relu(self.cnn_fc(cnn_out))  # shape: (batch_size, 256)
         
-        # LSTM pathway
-        lstm_out, (h_n, _) = self.lstm(x.transpose(1, 2))  # x needs to be (batch, seq, features)
+        # LSTM pathway - x shape: (batch_size, 1, input_dim)
+        lstm_in = x.squeeze(1).unsqueeze(1)  # Keep shape (batch_size, 1, input_dim) for LSTM
+        lstm_out, (h_n, _) = self.lstm(lstm_in)  # LSTM processes sequence
         lstm_out = h_n[-1]  # shape: (batch_size, lstm_hidden_dim)
         lstm_out = torch.relu(self.lstm_fc(lstm_out))  # shape: (batch_size, 256)
         
