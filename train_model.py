@@ -140,7 +140,16 @@ def main():
     }
     
     # Add architecture-specific parameters
-    if "hybrid_v3" in args.model:
+    if "transformer" in args.model:
+        # Transformer has different parameters
+        model_kwargs.update({
+            "embed_dim": 256,
+            "num_heads": 8,
+            "num_layers": 4,
+            "ff_dim": 1024,
+            "dropout_rate": 0.1
+        })
+    elif "hybrid_v3" in args.model:
         # hybrid_v3 doesn't take cnn_filters/cnn_kernel_sizes
         model_kwargs.update({
             "lstm_hidden_dim": 128,
@@ -156,6 +165,7 @@ def main():
             "dropout_rate": 0.3
         })
     else:
+        # LSTM model
         model_kwargs.update({
             "lstm_hidden_dim": 128,
             "fc_hidden_dim": 2048,
