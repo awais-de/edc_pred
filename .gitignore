@@ -1,35 +1,46 @@
+# Data directories
 data/raw/
 data/processed/
-experiments/checkpoints/
-experiments/logs/
-/models/old/
 data/.DS_Store
-.DS_Store
 
-data/raw/
-data/processed/
-experiments/checkpoints/
-experiments/logs/
+# Model directories
 /models/old/
+
+# Experiment result directories (with any timestamp)
+# These contain trained models and results - not needed in git
+experiments/lstm_*/
+experiments/hybrid_v1_*/
+experiments/hybrid_v2_*/
+experiments/hybrid_v3_*/
+
+# Keep structure directories empty
+!experiments/checkpoints/.gitkeep
+!experiments/logs/.gitkeep
+!experiments/configs/.gitkeep
+!experiments/figures/.gitkeep
+
+# Virtual environment
 /venv/
+
+# Python cache files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDE and system files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Package version artifacts (unused)
 =0.4.1
 =0.17.1
-experiments/lstm_20260118_143948/checkpoints/best_model.ckpt
-experiments/lstm_20260118_143948/tensorboard_logs/version_0/events.out.tfevents.1768743597.makalu59.rz.tu-ilmenau.de.69926.0
-src/data/__pycache__/__init__.cpython-36.pyc
-src/evaluation/__pycache__/metrics.cpython-36.pyc
-experiments/lstm_20260118_143948/tensorboard_logs/version_0/hparams.yaml
-src/data/__pycache__/data_loader.cpython-36.pyc
-src/models/__pycache__/__init__.cpython-36.pyc
-src/models/__pycache__/base_model.cpython-36.pyc
-src/models/__pycache__/hybrid_models.cpython-36.pyc
-src/models/__pycache__/lstm_model.cpython-36.pyc
-src/evaluation/__pycache__/__init__.cpython-36.pyc
-experiments/lstm_20260120_141938/metadata.json
-experiments/lstm_20260120_141938/predictions.npy
-experiments/lstm_20260120_141938/scaler_X.pkl
-experiments/lstm_20260120_141938/scaler_y.pkl
-experiments/lstm_20260120_141938/targets.npy
-experiments/lstm_20260120_141938/checkpoints/best_model.ckpt
-experiments/lstm_20260120_141938/tensorboard_logs/version_0/events.out.tfevents.1768915187.makalu59.rz.tu-ilmenau.de.45851.0
-experiments/lstm_20260120_141938/tensorboard_logs/version_0/hparams.yaml
+
