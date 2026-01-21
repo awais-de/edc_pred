@@ -77,6 +77,11 @@ def parse_arguments():
         help="Learning rate"
     )
     parser.add_argument(
+        "--scaler-type", type=str, default="minmax",
+        choices=["minmax", "standard", "robust"],
+        help="Scaler for inputs/targets"
+    )
+    parser.add_argument(
         "--precision", type=int, default=32,
         choices=[16, 32],
         help="Training precision (16 = mixed precision, 32 = full precision)"
@@ -156,9 +161,9 @@ def main():
     # ===== DATA SCALING =====
     print("Step 2: Scaling data...")
     X_scaled, y_scaled, scaler_X, scaler_y = scale_data(
-        room_features, edc_data, scaler_type="minmax"
+        room_features, edc_data, scaler_type=args.scaler_type
     )
-    print(f"✓ Data scaled using MinMax scaler\n")
+    print(f"✓ Data scaled using {args.scaler_type} scaler\n")
     
     # ===== DATALOADERS =====
     print("Step 3: Creating dataloaders...")
