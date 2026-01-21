@@ -155,9 +155,9 @@ class WeightedEDCLoss(nn.Module):
     def __init__(
         self, 
         sampling_rate: int = 48000,
-        edt_weight: float = 1.5,
-        t20_weight: float = 1.5,
-        c50_weight: float = 1.5,
+        edt_weight: float = 2.0,
+        t20_weight: float = 2.0,
+        c50_weight: float = 2.0,
         base_weight: float = 1.0
     ):
         """
