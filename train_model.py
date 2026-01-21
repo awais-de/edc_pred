@@ -53,6 +53,10 @@ def parse_arguments():
         help="Batch size for training"
     )
     parser.add_argument(
+        "--eval-batch-size", type=int, default=None,
+        help="Optional batch size for val/test to reduce peak memory (defaults to train batch size)"
+    )
+    parser.add_argument(
         "--num-workers", type=int, default=0,
         help="Number of DataLoader workers (0 = main process)"
     )
@@ -71,6 +75,11 @@ def parse_arguments():
     parser.add_argument(
         "--learning-rate", type=float, default=0.001,
         help="Learning rate"
+    )
+    parser.add_argument(
+        "--precision", type=int, default=32,
+        choices=[16, 32],
+        help="Training precision (16 = mixed precision, 32 = full precision)"
     )
     parser.add_argument(
         "--output-dir", type=str, default="experiments",
@@ -163,6 +172,12 @@ def main():
         pin_memory=args.pin_memory,
         persistent_workers=args.persistent_workers
     )
+
+    # Optionally use a smaller batch size for evaluation to reduce peak memory
+    eval_batch_size = args.eval_batch_size or args.batch_size
+    if eval_batch_size != args.batch_size:
+        val_loader.batch_size = eval_batch_size
+        test_loader.batch_size = eval_batch_size
     
     print(f"✓ Created dataloaders")
     print(f"  Train batches: {len(train_loader)}")
@@ -258,6 +273,7 @@ def main():
         max_epochs=args.max_epochs,
         accelerator=args.device if args.device != "auto" else "auto",
         devices="auto",
+        precision=args.precision,
         callbacks=callbacks,
         logger=logger,
         log_every_n_steps=5,
