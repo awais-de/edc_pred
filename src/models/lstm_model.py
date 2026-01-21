@@ -262,26 +262,27 @@ class AuxiliaryAcousticLoss(nn.Module):
         Returns:
             T20 values (batch_size,)
         """
-        eps = 1e-10
-        edc_db = 10 * torch.log10(edc + eps)
+        eps = 1e-8
+        # Clamp EDC to avoid log of very small numbers
+        edc_clamped = torch.clamp(edc, min=eps, max=1.0)
+        edc_db = 10 * torch.log10(edc_clamped)
         edc_db = edc_db - edc_db.max(dim=1, keepdim=True)[0]
         
         # Find approximate -5dB and -25dB crossing times
-        # Use soft argmin to keep differentiable
         time_axis = torch.arange(edc.shape[1], device=edc.device).float() / self.sampling_rate
         
-        # -5dB crossing (weighted average around crossing)
+        # -5dB crossing (weighted average around crossing, gentler weighting)
         dist_5db = torch.abs(edc_db + 5.0)
-        weights_5db = torch.softmax(-dist_5db * 10, dim=1)  # Sharp around crossing
+        weights_5db = torch.softmax(-dist_5db * 2.0, dim=1)  # Gentler weighting to avoid explosion
         time_5db = (weights_5db * time_axis).sum(dim=1)
         
         # -25dB crossing
         dist_25db = torch.abs(edc_db + 25.0)
-        weights_25db = torch.softmax(-dist_25db * 10, dim=1)
+        weights_25db = torch.softmax(-dist_25db * 2.0, dim=1)
         time_25db = (weights_25db * time_axis).sum(dim=1)
         
-        # T20 = 3 * (t_25 - t_5)
-        t20 = 3.0 * (time_25db - time_5db)
+        # T20 = 3 * (t_25 - t_5), clamp to reasonable range
+        t20 = 3.0 * torch.clamp(time_25db - time_5db, min=0.0, max=10.0)
         return t20
     
     def _compute_c50(self, edc: torch.Tensor) -> torch.Tensor:
@@ -295,12 +296,14 @@ class AuxiliaryAcousticLoss(nn.Module):
             C50 values (batch_size,)
         """
         idx_50ms = int(0.050 * self.sampling_rate)
-        eps = 1e-10
+        eps = 1e-8
         
-        early_energy = edc[:, :idx_50ms].sum(dim=1)
-        late_energy = edc[:, idx_50ms:].sum(dim=1)
+        early_energy = torch.clamp(edc[:, :idx_50ms].sum(dim=1), min=eps)
+        late_energy = torch.clamp(edc[:, idx_50ms:].sum(dim=1), min=eps)
         
-        c50 = 10 * torch.log10((early_energy + eps) / (late_energy + eps))
+        # Clamp ratio to avoid extreme values
+        ratio = torch.clamp(early_energy / late_energy, min=1e-6, max=1e6)
+        c50 = 10 * torch.log10(ratio)
         return c50
     
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
@@ -317,16 +320,25 @@ class AuxiliaryAcousticLoss(nn.Module):
         # Main MSE on EDC
         mse_loss = torch.nn.functional.mse_loss(y_pred, y_true)
         
-        # Auxiliary losses on derived metrics
-        t20_pred = self._compute_t20(y_pred)
-        t20_true = self._compute_t20(y_true)
-        t20_loss = torch.nn.functional.mse_loss(t20_pred, t20_true)
-        
-        c50_pred = self._compute_c50(y_pred)
-        c50_true = self._compute_c50(y_true)
-        c50_loss = torch.nn.functional.mse_loss(c50_pred, c50_true)
-        
-        # Combined
-        total_loss = mse_loss + self.aux_weight * (t20_loss + c50_loss)
+        # Auxiliary losses on derived metrics (with error handling)
+        try:
+            t20_pred = self._compute_t20(y_pred)
+            t20_true = self._compute_t20(y_true)
+            t20_loss = torch.nn.functional.mse_loss(t20_pred, t20_true)
+            
+            c50_pred = self._compute_c50(y_pred)
+            c50_true = self._compute_c50(y_true)
+            c50_loss = torch.nn.functional.mse_loss(c50_pred, c50_true)
+            
+            # Check for NaN
+            if torch.isnan(t20_loss) or torch.isnan(c50_loss):
+                # Fall back to just MSE if auxiliary losses fail
+                return mse_loss
+            
+            # Combined
+            total_loss = mse_loss + self.aux_weight * (t20_loss + c50_loss)
+        except:
+            # Fall back to MSE if anything goes wrong
+            total_loss = mse_loss
         
         return total_loss
