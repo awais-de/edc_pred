@@ -63,14 +63,16 @@ class LSTMModel(BaseEDCModel):
             self.criterion = WeightedEDCLoss(
                 sampling_rate=48000,
                 edt_weight=2.0,
-                t20_weight=3.0,
-                c50_weight=3.0,
+                t20_weight=2.0,
+                c50_weight=2.0,
                 base_weight=1.0
-            )        elif self.loss_type == "auxiliary":
+            )
+        elif self.loss_type == "auxiliary":
             self.criterion = AuxiliaryAcousticLoss(
                 sampling_rate=48000,
                 aux_weight=0.3
-            )        else:
+            )
+        else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
