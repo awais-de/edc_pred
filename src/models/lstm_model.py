@@ -146,18 +146,18 @@ class WeightedEDCLoss(nn.Module):
     Region-weighted EDC loss that emphasizes T20 and C50 critical zones.
     
     Weights different EDC regions based on their importance for acoustic parameters:
-    - EDT region (0 to -10dB): Weight 2.0
-    - T20 region (-5dB to -25dB): Weight 3.0 (most critical)
-    - C50 early region (first 50ms): Weight 3.0 (most critical)
+    - EDT region (0 to -10dB): Weight 1.5
+    - T20 region (-5dB to -25dB): Weight 1.5 (critical)
+    - C50 early region (first 50ms): Weight 1.5 (critical)
     - Late decay: Weight 1.0 (baseline)
     """
     
     def __init__(
         self, 
         sampling_rate: int = 48000,
-        edt_weight: float = 2.0,
-        t20_weight: float = 3.0,
-        c50_weight: float = 3.0,
+        edt_weight: float = 1.5,
+        t20_weight: float = 1.5,
+        c50_weight: float = 1.5,
         base_weight: float = 1.0
     ):
         """

@@ -86,9 +86,9 @@ class CNNLSTMHybridV1(BaseEDCModel):
         elif self.loss_type == "weighted_edc":
             self.criterion = WeightedEDCLoss(
                 sampling_rate=48000,
-                edt_weight=2.0,
-                t20_weight=3.0,
-                c50_weight=3.0,
+                edt_weight=1.5,
+                t20_weight=1.5,
+                c50_weight=1.5,
                 base_weight=1.0
             )
         else:
@@ -210,9 +210,9 @@ class CNNLSTMHybridV2(BaseEDCModel):
         elif self.loss_type == "weighted_edc":
             self.criterion = WeightedEDCLoss(
                 sampling_rate=48000,
-                edt_weight=2.0,
-                t20_weight=3.0,
-                c50_weight=3.0,
+                edt_weight=1.5,
+                t20_weight=1.5,
+                c50_weight=1.5,
                 base_weight=1.0
             )
         else:
@@ -324,9 +324,9 @@ class CNNLSTMHybridV3(BaseEDCModel):
         elif self.loss_type == "weighted_edc":
             self.criterion = WeightedEDCLoss(
                 sampling_rate=48000,
-                edt_weight=2.0,
-                t20_weight=3.0,
-                c50_weight=3.0,
+                edt_weight=1.5,
+                t20_weight=1.5,
+                c50_weight=1.5,
                 base_weight=1.0
             )
         else:
