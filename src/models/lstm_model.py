@@ -66,8 +66,11 @@ class LSTMModel(BaseEDCModel):
                 t20_weight=3.0,
                 c50_weight=3.0,
                 base_weight=1.0
-            )
-        else:
+            )        elif self.loss_type == "auxiliary":
+            self.criterion = AuxiliaryAcousticLoss(
+                sampling_rate=48000,
+                aux_weight=0.3
+            )        else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -223,3 +226,105 @@ class WeightedEDCLoss(nn.Module):
         loss = weighted_error.mean()
         
         return loss
+
+
+class AuxiliaryAcousticLoss(nn.Module):
+    """
+    MSE loss with auxiliary supervision on derived acoustic parameters.
+    
+    Loss = MSE(EDC) + lambda * (MSE(T20_derived) + MSE(C50_derived))
+    
+    This directly supervises T20 and C50 metrics computed from the EDC,
+    encouraging the model to get those regions right.
+    """
+    
+    def __init__(self, sampling_rate: int = 48000, aux_weight: float = 0.3):
+        """
+        Initialize auxiliary loss.
+        
+        Args:
+            sampling_rate: Sampling rate of EDC (default 48kHz)
+            aux_weight: Weight for auxiliary losses on T20/C50
+        """
+        super().__init__()
+        self.sampling_rate = sampling_rate
+        self.aux_weight = aux_weight
+    
+    def _compute_t20(self, edc: torch.Tensor) -> torch.Tensor:
+        """
+        Compute T20 from EDC (differentiable approximation).
+        
+        Args:
+            edc: EDC tensor (batch_size, seq_len)
+            
+        Returns:
+            T20 values (batch_size,)
+        """
+        eps = 1e-10
+        edc_db = 10 * torch.log10(edc + eps)
+        edc_db = edc_db - edc_db.max(dim=1, keepdim=True)[0]
+        
+        # Find approximate -5dB and -25dB crossing times
+        # Use soft argmin to keep differentiable
+        time_axis = torch.arange(edc.shape[1], device=edc.device).float() / self.sampling_rate
+        
+        # -5dB crossing (weighted average around crossing)
+        dist_5db = torch.abs(edc_db + 5.0)
+        weights_5db = torch.softmax(-dist_5db * 10, dim=1)  # Sharp around crossing
+        time_5db = (weights_5db * time_axis).sum(dim=1)
+        
+        # -25dB crossing
+        dist_25db = torch.abs(edc_db + 25.0)
+        weights_25db = torch.softmax(-dist_25db * 10, dim=1)
+        time_25db = (weights_25db * time_axis).sum(dim=1)
+        
+        # T20 = 3 * (t_25 - t_5)
+        t20 = 3.0 * (time_25db - time_5db)
+        return t20
+    
+    def _compute_c50(self, edc: torch.Tensor) -> torch.Tensor:
+        """
+        Compute C50 from EDC (differentiable).
+        
+        Args:
+            edc: EDC tensor (batch_size, seq_len)
+            
+        Returns:
+            C50 values (batch_size,)
+        """
+        idx_50ms = int(0.050 * self.sampling_rate)
+        eps = 1e-10
+        
+        early_energy = edc[:, :idx_50ms].sum(dim=1)
+        late_energy = edc[:, idx_50ms:].sum(dim=1)
+        
+        c50 = 10 * torch.log10((early_energy + eps) / (late_energy + eps))
+        return c50
+    
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        """
+        Compute combined loss.
+        
+        Args:
+            y_pred: Predicted EDC (batch_size, seq_len)
+            y_true: Ground truth EDC (batch_size, seq_len)
+            
+        Returns:
+            Combined loss
+        """
+        # Main MSE on EDC
+        mse_loss = torch.nn.functional.mse_loss(y_pred, y_true)
+        
+        # Auxiliary losses on derived metrics
+        t20_pred = self._compute_t20(y_pred)
+        t20_true = self._compute_t20(y_true)
+        t20_loss = torch.nn.functional.mse_loss(t20_pred, t20_true)
+        
+        c50_pred = self._compute_c50(y_pred)
+        c50_true = self._compute_c50(y_true)
+        c50_loss = torch.nn.functional.mse_loss(c50_pred, c50_true)
+        
+        # Combined
+        total_loss = mse_loss + self.aux_weight * (t20_loss + c50_loss)
+        
+        return total_loss

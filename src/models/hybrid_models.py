@@ -4,7 +4,7 @@ CNN-LSTM Hybrid models for EDC prediction.
 
 import torch
 import torch.nn as nn
-from .lstm_model import EDCRIRLoss, WeightedEDCLoss
+from .lstm_model import EDCRIRLoss, WeightedEDCLoss, AuxiliaryAcousticLoss
 from .base_model import BaseEDCModel
 
 
@@ -90,6 +90,11 @@ class CNNLSTMHybridV1(BaseEDCModel):
                 t20_weight=2.0,
                 c50_weight=2.0,
                 base_weight=1.0
+            )
+        elif self.loss_type == "auxiliary":
+            self.criterion = AuxiliaryAcousticLoss(
+                sampling_rate=48000,
+                aux_weight=0.3
             )
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
@@ -215,6 +220,11 @@ class CNNLSTMHybridV2(BaseEDCModel):
                 c50_weight=2.0,
                 base_weight=1.0
             )
+        elif self.loss_type == "auxiliary":
+            self.criterion = AuxiliaryAcousticLoss(
+                sampling_rate=48000,
+                aux_weight=0.3
+            )
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
     
@@ -327,6 +337,11 @@ class CNNLSTMHybridV3(BaseEDCModel):
                 t20_weight=2.0,
                 c50_weight=2.0,
                 base_weight=1.0
+            )
+        elif self.loss_type == "auxiliary":
+            self.criterion = AuxiliaryAcousticLoss(
+                sampling_rate=48000,
+                aux_weight=0.3
             )
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")

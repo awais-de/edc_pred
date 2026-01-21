@@ -97,8 +97,8 @@ def parse_arguments():
     )
     parser.add_argument(
         "--loss-type", type=str, default="mse",
-        choices=["mse", "edc_rir", "weighted_edc"],
-        help="Loss function type: mse (MSE), edc_rir (EDC+RIR weighted loss), or weighted_edc (region-weighted EDC loss)"
+        choices=["mse", "edc_rir", "weighted_edc", "auxiliary"],
+        help="Loss function type: mse (MSE), edc_rir (EDC+RIR weighted loss), weighted_edc (region-weighted EDC loss), or auxiliary (MSE + T20/C50 supervision)"
     )
     parser.add_argument(
         "--train-ratio", type=float, default=0.6,
