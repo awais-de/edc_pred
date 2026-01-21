@@ -53,6 +53,18 @@ def parse_arguments():
         help="Batch size for training"
     )
     parser.add_argument(
+        "--num-workers", type=int, default=0,
+        help="Number of DataLoader workers (0 = main process)"
+    )
+    parser.add_argument(
+        "--pin-memory", action="store_true",
+        help="Pin CPU memory for faster host-to-GPU transfer"
+    )
+    parser.add_argument(
+        "--persistent-workers", action="store_true",
+        help="Keep DataLoader workers alive across epochs (requires num-workers > 0)"
+    )
+    parser.add_argument(
         "--max-epochs", type=int, default=100,
         help="Maximum number of epochs"
     )
@@ -138,7 +150,10 @@ def main():
         batch_size=args.batch_size,
         train_ratio=args.train_ratio,
         val_ratio=args.val_ratio,
-        input_reshape=True
+        input_reshape=True,
+        num_workers=args.num_workers,
+        pin_memory=args.pin_memory,
+        persistent_workers=args.persistent_workers
     )
     
     print(f"✓ Created dataloaders")

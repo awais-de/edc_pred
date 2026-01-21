@@ -178,7 +178,10 @@ def create_dataloaders(
     train_ratio: float = 0.6,
     val_ratio: float = 0.2,
     random_state: int = 42,
-    input_reshape: bool = True
+    input_reshape: bool = True,
+    num_workers: int = 0,
+    pin_memory: bool = False,
+    persistent_workers: bool = False
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Create train/val/test dataloaders.
@@ -191,6 +194,9 @@ def create_dataloaders(
         val_ratio: Proportion for validation (remainder is test)
         random_state: Random seed
         input_reshape: Whether to reshape X to (batch, 1, features)
+        num_workers: Dataloader workers for background loading
+        pin_memory: Pin CPU memory for faster H2D transfer
+        persistent_workers: Keep workers alive between epochs
         
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
@@ -216,8 +222,29 @@ def create_dataloaders(
     test_dataset = EDCDataset(X_test, y_test)
     
     # Create loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
+    )
     
     return train_loader, val_loader, test_loader
