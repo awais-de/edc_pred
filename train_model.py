@@ -94,6 +94,14 @@ def parse_arguments():
         "--val-ratio", type=float, default=0.2,
         help="Proportion of data for validation"
     )
+    parser.add_argument(
+        "--early-stop-patience", type=int, default=15,
+        help="Early stopping patience (epochs without val_loss improvement)"
+    )
+    parser.add_argument(
+        "--disable-early-stop", action="store_true",
+        help="Disable early stopping to force training for max_epochs"
+    )
     
     return parser.parse_args()
 
@@ -220,12 +228,15 @@ def main():
     print(f"  Batch size: {args.batch_size}\n")
     
     # Setup callbacks
-    early_stop = EarlyStopping(
-        monitor="val_loss",
-        patience=15,
-        mode="min",
-        verbose=True
-    )
+    callbacks = []
+    if not args.disable_early_stop:
+        early_stop = EarlyStopping(
+            monitor="val_loss",
+            patience=args.early_stop_patience,
+            mode="min",
+            verbose=True
+        )
+        callbacks.append(early_stop)
     
     checkpoint = ModelCheckpoint(
         dirpath=os.path.join(output_dir, "checkpoints"),
@@ -234,6 +245,7 @@ def main():
         save_top_k=1,
         verbose=False
     )
+    callbacks.append(checkpoint)
     
     # Setup logger
     logger = TensorBoardLogger(
@@ -246,7 +258,7 @@ def main():
         max_epochs=args.max_epochs,
         accelerator=args.device if args.device != "auto" else "auto",
         devices="auto",
-        callbacks=[early_stop, checkpoint],
+        callbacks=callbacks,
         logger=logger,
         log_every_n_steps=5,
         enable_progress_bar=True,
