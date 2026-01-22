@@ -7,34 +7,166 @@ Usage:
 Reads metadata.json from all experiment directories and computes metrics from predictions.npy
 """
 
-import os
-import json
-import argparse
+#!/usr/bin/env python3
+"""
+Compare all training runs by extracting metrics from predictions/targets.
+"""
+
 from pathlib import Path
-from datetime import datetime
-import pandas as pd
+import json
 import numpy as np
+import pandas as pd
+import argparse
+from datetime import datetime
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
-def compute_metrics_simple(targets, predictions):
-    """Simple metric computation without external module dependency."""
-    metrics = {}
+def extract_all_runs(experiments_dir="experiments"):
+    """Extract metrics from all complete runs."""
+    runs = []
+    errors = []
     
-    # Overall EDC metrics
-    mae = mean_absolute_error(targets, predictions)
-    rmse = np.sqrt(mean_squared_error(targets, predictions))
-    r2 = r2_score(targets, predictions)
+    experiments_path = Path(experiments_dir)
+    if not experiments_path.exists():
+        print(f"Experiments directory not found: {experiments_dir}")
+        return runs
     
-    metrics["overall_edc"] = {"mae": mae, "rmse": rmse, "r2": r2}
+    print(f"\nScanning {experiments_dir} for complete runs...\n")
     
-    # Try to compute acoustic parameters (EDT, T20, C50)
-    # This is a simplified version - proper computation would be in the metrics module
-    # For now, we'll just try to load from metadata if available
+    for run_dir in sorted(experiments_path.iterdir()):
+        if not run_dir.is_dir():
+            continue
+        
+        # Check if run is complete
+        metadata_file = run_dir / "metadata.json"
+        preds_file = run_dir / "predictions.npy"
+        targets_file = run_dir / "targets.npy"
+        
+        if not (metadata_file.exists() and preds_file.exists() and targets_file.exists()):
+            continue
+        
+        try:
+            # Load metadata
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+            
+            # Load predictions and targets
+            predictions = np.load(preds_file)
+            targets = np.load(targets_file)
+            
+            # Compute metrics
+            mae = mean_absolute_error(targets, predictions)
+            rmse = np.sqrt(mean_squared_error(targets, predictions))
+            r2 = r2_score(targets, predictions)
+            
+            # Extract config
+            run_info = {
+                "run_id": run_dir.name,
+                "model": metadata.get("model_name"),
+                "loss_type": metadata.get("loss_config", {}).get("loss_type"),
+                "batch_size": metadata.get("training_config", {}).get("batch_size"),
+                "epochs": metadata.get("training_config", {}).get("actual_epochs"),
+                "duration_min": metadata.get("training_config", {}).get("training_duration_minutes"),
+                "precision": metadata.get("precision_config", {}).get("precision"),
+                "gradient_clip": metadata.get("loss_config", {}).get("gradient_clip_val"),
+                "aux_weight": metadata.get("loss_config", {}).get("aux_weight"),
+                "scaler_type": metadata.get("data_loader_config", {}).get("scaler_type"),
+                "mae": mae,
+                "rmse": rmse,
+                "r2": r2
+            }
+            
+            runs.append(run_info)
+        
+        except json.JSONDecodeError as e:
+            errors.append(f"  ⚠ {run_dir.name}: JSON parsing error")
+        except Exception as e:
+            errors.append(f"  ⚠ {run_dir.name}: {type(e).__name__}")
     
-    return metrics
+    if errors:
+        print("Skipped malformed runs:")
+        for error in errors:
+            print(error)
+        print()
+    
+    return runs
 
 
+def print_comparison(runs, sort_by="mae"):
+    """Print comparison table."""
+    if not runs:
+        print("No complete runs found")
+        return
+    
+    df = pd.DataFrame(runs)
+    
+    # Sort by specified metric
+    if sort_by in df.columns:
+        df = df.sort_values(sort_by)
+    
+    # Display columns
+    display_cols = [
+        "run_id", "model", "loss_type", "batch_size", "epochs",
+        "duration_min", "precision", "gradient_clip", "aux_weight",
+        "mae", "rmse", "r2"
+    ]
+    display_cols = [col for col in display_cols if col in df.columns]
+    
+    df_display = df.fillna("—")
+    
+    print("="*200)
+    print(f"TRAINING RUNS COMPARISON ({len(df)} runs, sorted by {sort_by})")
+    print("="*200)
+    print(df_display[display_cols].to_string(index=False))
+    print("="*200)
+    
+    # Best performers
+    print("\n🏆 TOP PERFORMERS:\n")
+    
+    for idx, (_, row) in enumerate(df.head(5).iterrows(), 1):
+        print(f"{idx}. {row['run_id']}")
+        print(f"   Model: {row['model']}, Loss: {row['loss_type'] if row['loss_type'] else 'N/A'}")
+        print(f"   Epochs: {int(row['epochs']) if pd.notna(row['epochs']) else 'N/A'}, "
+              f"Batch: {int(row['batch_size']) if pd.notna(row['batch_size']) else 'N/A'}")
+        print(f"   MAE: {row['mae']:.6f}, RMSE: {row['rmse']:.6f}, R²: {row['r2']:.6f}\n")
+
+
+def export_results(runs, format="csv"):
+    """Export results to file."""
+    if not runs:
+        return
+    
+    df = pd.DataFrame(runs)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    if format == "csv":
+        filename = f"experiments/runs_comparison_{timestamp}.csv"
+        df.to_csv(filename, index=False)
+        print(f"✓ Exported to {filename}\n")
+    elif format == "json":
+        filename = f"experiments/runs_comparison_{timestamp}.json"
+        df.to_json(filename, orient="records", indent=2)
+        print(f"✓ Exported to {filename}\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Compare all training runs")
+    parser.add_argument("--sort-by", type=str, default="mae",
+                        help="Column to sort by (default: mae)")
+    parser.add_argument("--export", type=str, choices=["csv", "json"],
+                        help="Export results to CSV or JSON")
+    
+    args = parser.parse_args()
+    
+    runs = extract_all_runs()
+    print_comparison(runs, sort_by=args.sort_by)
+    
+    if args.export:
+        export_results(runs, format=args.export)
+
+
+if __name__ == "__main__":
+    main()
 def load_all_runs(experiments_dir="experiments"):
     """Load metadata from all completed runs and compute/extract metrics."""
     runs = []
