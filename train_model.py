@@ -128,6 +128,18 @@ def parse_arguments():
         "--no-mixed-precision", action="store_true",
         help="Disable mixed precision (force 32-bit precision) for debugging numerical issues"
     )
+    parser.add_argument(
+        "--edt-weight", type=float, default=1.5,
+        help="Weight for EDT region (0 to -10dB) in weighted_edc loss (default 1.5)"
+    )
+    parser.add_argument(
+        "--t20-weight", type=float, default=1.5,
+        help="Weight for T20 region (-5dB to -25dB) in weighted_edc loss (default 1.5)"
+    )
+    parser.add_argument(
+        "--c50-weight", type=float, default=1.5,
+        help="Weight for C50 early region (first 50ms) in weighted_edc loss (default 1.5)"
+    )
     
     return parser.parse_args()
 
@@ -250,8 +262,13 @@ def main():
     if args.loss_type == "auxiliary" and hasattr(model.criterion, 'aux_weight'):
         model.criterion.aux_weight = args.aux_weight
         print(f"  Auxiliary loss weight set to: {args.aux_weight}")
-    
-    total_params = sum(p.numel() for p in model.parameters())
+        # Patch weighted_edc weights if specified via CLI
+    if args.loss_type == "weighted_edc" and hasattr(model.criterion, 'edt_weight'):
+        model.criterion.edt_weight = args.edt_weight
+        model.criterion.t20_weight = args.t20_weight
+        model.criterion.c50_weight = args.c50_weight
+        print(f"  Weighted EDC loss weights set to: EDT={args.edt_weight}, T20={args.t20_weight}, C50={args.c50_weight}")
+        total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
     print(f"✓ Initialized {args.model} model")
@@ -384,7 +401,10 @@ def main():
         "loss_config": {
             "loss_type": args.loss_type,
             "gradient_clip_val": args.gradient_clip_val,
-            "aux_weight": args.aux_weight if args.loss_type == "auxiliary" else None
+            "aux_weight": args.aux_weight if args.loss_type == "auxiliary" else None,
+            "edt_weight": args.edt_weight if args.loss_type == "weighted_edc" else None,
+            "t20_weight": args.t20_weight if args.loss_type == "weighted_edc" else None,
+            "c50_weight": args.c50_weight if args.loss_type == "weighted_edc" else None
         },
         "precision_config": {
             "precision": int(precision_to_use),

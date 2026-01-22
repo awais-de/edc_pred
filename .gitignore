@@ -17,6 +17,11 @@ experiments/results_summary.csv
 experiments/runs_comparison_*.csv
 experiments/runs_comparison_*.json
 
+# Parallel training logs
+run1_conservative.log
+run2_moderate.log
+run3_aggressive.log
+
 # Keep structure directories empty
 !experiments/checkpoints/.gitkeep
 !experiments/logs/.gitkeep
