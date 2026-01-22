@@ -24,6 +24,8 @@ def load_all_runs(experiments_dir="experiments"):
         print(f"Experiments directory not found: {experiments_dir}")
         return runs
     
+    errors = []
+    
     # Find all subdirectories with metadata.json
     for run_dir in sorted(experiments_path.iterdir()):
         if not run_dir.is_dir():
@@ -64,9 +66,15 @@ def load_all_runs(experiments_dir="experiments"):
             
             runs.append(run_info)
         
+        except json.JSONDecodeError as e:
+            errors.append(f"  ⚠ {run_dir.name}: JSON parsing error ({str(e)[:60]})")
         except Exception as e:
-            print(f"Error loading {run_dir}: {e}")
-            continue
+            errors.append(f"  ⚠ {run_dir.name}: {type(e).__name__} ({str(e)[:60]})")
+    
+    if errors:
+        print("\n⚠ Skipped malformed runs:")
+        for error in errors:
+            print(error)
     
     return runs
 
@@ -79,37 +87,56 @@ def print_summary(runs, sort_by="duration_min"):
     
     df = pd.DataFrame(runs)
     
-    # Sort by specified metric
-    if sort_by in df.columns:
-        df = df.sort_values(by=sort_by, ascending=True)
+    # Fill None/NaN with "—" for display
+    df_display = df.fillna("—")
     
-    # Display key columns
+    # Sort by specified metric (only if column exists and has numeric values)
+    if sort_by in df.columns:
+        # Try to sort by numeric values, ignoring non-numeric
+        try:
+            numeric_df = pd.to_numeric(df[sort_by], errors='coerce')
+            sort_indices = numeric_df.argsort()
+            df_display = df_display.iloc[sort_indices]
+        except:
+            # If sorting fails, just use original order
+            pass
+    
+    # Display key columns (only those that exist)
     display_cols = [
         "run_id", "model", "loss_type", "batch_size", "epochs", 
         "duration_min", "precision", "gradient_clip", "aux_weight",
-        "overall_edc_mae", "t20_mae", "c50_mae", "edt_mae"
+        "overall_edc_mae", "edt_mae", "t20_mae", "c50_mae"
     ]
     
     # Only include columns that exist
-    display_cols = [col for col in display_cols if col in df.columns]
+    display_cols = [col for col in display_cols if col in df_display.columns]
     
-    print("\n" + "="*150)
+    print("\n" + "="*180)
     print("TRAINING RUNS COMPARISON")
-    print("="*150)
-    print(df[display_cols].to_string(index=False))
-    print("="*150)
+    print("="*180)
+    print(df_display[display_cols].to_string(index=False))
+    print("="*180)
     
-    # Print best performers for key metrics
+    # Print best performers for key metrics (only numeric values)
     print("\n🏆 BEST PERFORMERS:\n")
-    metrics_to_track = ["edt_mae", "t20_mae", "c50_mae", "overall_edc_mae", "duration_min"]
-    for metric in metrics_to_track:
+    metrics_to_track = [
+        ("duration_min", "Fastest"),
+        ("overall_edc_mae", "Best Overall EDC MAE"),
+        ("edt_mae", "Best EDT MAE"),
+        ("t20_mae", "Best T20 MAE"),
+        ("c50_mae", "Best C50 MAE")
+    ]
+    
+    for metric, label in metrics_to_track:
         if metric in df.columns:
-            if metric == "duration_min":
-                best_idx = df[metric].idxmin()
-                print(f"  Fastest:  {df.loc[best_idx, 'run_id']} ({df.loc[best_idx, metric]:.1f} min)")
-            else:
-                best_idx = df[metric].idxmin()
-                print(f"  Best {metric:15s}: {df.loc[best_idx, 'run_id']} ({df.loc[best_idx, metric]:.4f})")
+            # Convert to numeric, ignoring errors
+            numeric_vals = pd.to_numeric(df[metric], errors='coerce')
+            if numeric_vals.notna().any():  # If there's at least one numeric value
+                best_idx = numeric_vals.idxmin()
+                best_val = numeric_vals[best_idx]
+                if pd.notna(best_val):
+                    run_id = df.loc[best_idx, 'run_id']
+                    print(f"  {label:25s}: {run_id:35s} ({best_val:.4f})")
 
 
 def export_results(runs, format="csv"):
