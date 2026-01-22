@@ -14,15 +14,25 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 import numpy as np
-from sys import path as sys_path
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# Add src to path for importing metrics module
-sys_path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-try:
-    from evaluation.metrics import evaluate_model
-except ImportError:
-    evaluate_model = None
+def compute_metrics_simple(targets, predictions):
+    """Simple metric computation without external module dependency."""
+    metrics = {}
+    
+    # Overall EDC metrics
+    mae = mean_absolute_error(targets, predictions)
+    rmse = np.sqrt(mean_squared_error(targets, predictions))
+    r2 = r2_score(targets, predictions)
+    
+    metrics["overall_edc"] = {"mae": mae, "rmse": rmse, "r2": r2}
+    
+    # Try to compute acoustic parameters (EDT, T20, C50)
+    # This is a simplified version - proper computation would be in the metrics module
+    # For now, we'll just try to load from metadata if available
+    
+    return metrics
 
 
 def load_all_runs(experiments_dir="experiments"):
@@ -84,7 +94,7 @@ def load_all_runs(experiments_dir="experiments"):
                 metrics_loaded_from_file = True
             
             # If metrics not in metadata, try to compute from predictions.npy and targets.npy
-            if not metrics_loaded_from_file and evaluate_model:
+            if not metrics_loaded_from_file:
                 preds_file = run_dir / "predictions.npy"
                 targets_file = run_dir / "targets.npy"
                 
@@ -93,8 +103,8 @@ def load_all_runs(experiments_dir="experiments"):
                         preds = np.load(preds_file)
                         targets = np.load(targets_file)
                         
-                        # Compute metrics using the evaluation module
-                        computed_metrics = evaluate_model(targets, preds, compute_acoustic=True)
+                        # Compute metrics using the simple function
+                        computed_metrics = compute_metrics_simple(targets, preds)
                         
                         # Add computed metrics to run_info
                         for metric_type in ["overall_edc", "edt", "t20", "c50"]:
