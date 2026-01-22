@@ -116,6 +116,18 @@ def parse_arguments():
         "--disable-early-stop", action="store_true",
         help="Disable early stopping to force training for max_epochs"
     )
+    parser.add_argument(
+        "--gradient-clip-val", type=float, default=None,
+        help="Gradient clipping threshold (None to disable); recommended 1.0-10.0 for stability"
+    )
+    parser.add_argument(
+        "--aux-weight", type=float, default=0.1,
+        help="Weight for auxiliary T20/C50 losses when using --loss-type auxiliary (default 0.1)"
+    )
+    parser.add_argument(
+        "--no-mixed-precision", action="store_true",
+        help="Disable mixed precision (force 32-bit precision) for debugging numerical issues"
+    )
     
     return parser.parse_args()
 
@@ -234,6 +246,11 @@ def main():
     
     model = get_model(args.model, **model_kwargs)
     
+    # Patch aux_weight if using auxiliary loss
+    if args.loss_type == "auxiliary" and hasattr(model.criterion, 'aux_weight'):
+        model.criterion.aux_weight = args.aux_weight
+        print(f"  Auxiliary loss weight set to: {args.aux_weight}")
+    
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
@@ -245,7 +262,13 @@ def main():
     print("Step 5: Training model...")
     print(f"  Epochs: {args.max_epochs}")
     print(f"  Learning rate: {args.learning_rate}")
-    print(f"  Batch size: {args.batch_size}\n")
+    print(f"  Batch size: {args.batch_size}")
+    if args.gradient_clip_val is not None:
+        print(f"  Gradient clipping: {args.gradient_clip_val}")
+    if args.no_mixed_precision:
+        print(f"  Precision: 32-bit (mixed precision disabled)\n")
+    else:
+        print(f"  Precision: {args.precision}-bit\n")
     
     # Setup callbacks
     callbacks = []
@@ -274,17 +297,20 @@ def main():
     )
     
     # Create trainer
+    precision_to_use = 32 if args.no_mixed_precision else args.precision
+    gradient_clip = args.gradient_clip_val if args.gradient_clip_val is not None else None
+    
     trainer = Trainer(
         max_epochs=args.max_epochs,
         accelerator=args.device if args.device != "auto" else "auto",
         devices="auto",
-        precision=args.precision,
+        precision=precision_to_use,
         callbacks=callbacks,
         logger=logger,
         log_every_n_steps=5,
         enable_progress_bar=True,
         enable_model_summary=True,
-        gradient_clip_val=1.0
+        gradient_clip_val=gradient_clip
     )
     
     train_start = time.time()

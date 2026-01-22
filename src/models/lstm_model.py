@@ -240,17 +240,18 @@ class AuxiliaryAcousticLoss(nn.Module):
     encouraging the model to get those regions right.
     """
     
-    def __init__(self, sampling_rate: int = 48000, aux_weight: float = 0.3):
+    def __init__(self, sampling_rate: int = 48000, aux_weight: float = 0.1):
         """
         Initialize auxiliary loss.
         
         Args:
             sampling_rate: Sampling rate of EDC (default 48kHz)
-            aux_weight: Weight for auxiliary losses on T20/C50
+            aux_weight: Weight for auxiliary losses on T20/C50 (default 0.1 for stability)
         """
         super().__init__()
         self.sampling_rate = sampling_rate
-        self.aux_weight = aux_weight
+        # Clamp aux_weight to stable range [0.01, 1.0]
+        self.aux_weight = float(min(max(aux_weight, 0.01), 1.0))
     
     def _compute_t20(self, edc: torch.Tensor) -> torch.Tensor:
         """
@@ -268,21 +269,26 @@ class AuxiliaryAcousticLoss(nn.Module):
         edc_db = 10 * torch.log10(edc_clamped)
         edc_db = edc_db - edc_db.max(dim=1, keepdim=True)[0]
         
+        # Clamp edc_db to avoid extreme values
+        edc_db = torch.clamp(edc_db, min=-60.0, max=0.0)
+        
         # Find approximate -5dB and -25dB crossing times
         time_axis = torch.arange(edc.shape[1], device=edc.device).float() / self.sampling_rate
         
-        # -5dB crossing (weighted average around crossing, gentler weighting)
+        # -5dB crossing (very gentle weighting to avoid gradient explosion)
         dist_5db = torch.abs(edc_db + 5.0)
-        weights_5db = torch.softmax(-dist_5db * 2.0, dim=1)  # Gentler weighting to avoid explosion
+        weights_5db = torch.softmax(-dist_5db * 1.0, dim=1)  # Even gentler: tau=1.0
         time_5db = (weights_5db * time_axis).sum(dim=1)
         
         # -25dB crossing
         dist_25db = torch.abs(edc_db + 25.0)
-        weights_25db = torch.softmax(-dist_25db * 2.0, dim=1)
+        weights_25db = torch.softmax(-dist_25db * 1.0, dim=1)
         time_25db = (weights_25db * time_axis).sum(dim=1)
         
         # T20 = 3 * (t_25 - t_5), clamp to reasonable range
-        t20 = 3.0 * torch.clamp(time_25db - time_5db, min=0.0, max=10.0)
+        t20_raw = time_25db - time_5db
+        t20_raw = torch.clamp(t20_raw, min=0.0, max=5.0)  # More conservative max
+        t20 = 3.0 * t20_raw
         return t20
     
     def _compute_c50(self, edc: torch.Tensor) -> torch.Tensor:
@@ -317,28 +323,46 @@ class AuxiliaryAcousticLoss(nn.Module):
         Returns:
             Combined loss
         """
+        eps = 1e-8
+        # Clamp predictions to valid range to prevent numerical issues
+        y_pred = torch.clamp(y_pred, min=eps, max=1.0 + eps)
+        y_true = torch.clamp(y_true, min=eps, max=1.0 + eps)
+        
         # Main MSE on EDC
         mse_loss = torch.nn.functional.mse_loss(y_pred, y_true)
+        
+        # Clamp MSE loss itself to prevent explosion
+        mse_loss = torch.clamp(mse_loss, max=1e4)
         
         # Auxiliary losses on derived metrics (with error handling)
         try:
             t20_pred = self._compute_t20(y_pred)
             t20_true = self._compute_t20(y_true)
+            
+            # Clamp T20 values to reasonable range before computing loss
+            t20_pred = torch.clamp(t20_pred, min=0.0, max=5.0)
+            t20_true = torch.clamp(t20_true, min=0.0, max=5.0)
             t20_loss = torch.nn.functional.mse_loss(t20_pred, t20_true)
+            t20_loss = torch.clamp(t20_loss, max=1e4)
             
             c50_pred = self._compute_c50(y_pred)
             c50_true = self._compute_c50(y_true)
-            c50_loss = torch.nn.functional.mse_loss(c50_pred, c50_true)
             
-            # Check for NaN
-            if torch.isnan(t20_loss) or torch.isnan(c50_loss):
+            # Clamp C50 values to reasonable range
+            c50_pred = torch.clamp(c50_pred, min=-50.0, max=50.0)
+            c50_true = torch.clamp(c50_true, min=-50.0, max=50.0)
+            c50_loss = torch.nn.functional.mse_loss(c50_pred, c50_true)
+            c50_loss = torch.clamp(c50_loss, max=1e4)
+            
+            # Check for NaN or Inf
+            if torch.isnan(t20_loss) or torch.isnan(c50_loss) or torch.isinf(t20_loss) or torch.isinf(c50_loss):
                 # Fall back to just MSE if auxiliary losses fail
                 return mse_loss
             
-            # Combined
-            total_loss = mse_loss + self.aux_weight * (t20_loss + c50_loss)
-        except:
+            # Combined (both losses in 0-1 scale roughly, aux_weight keeps total stable)
+            total_loss = mse_loss + self.aux_weight * (0.5 * t20_loss + 0.5 * c50_loss)
+        except Exception as e:
             # Fall back to MSE if anything goes wrong
-            total_loss = mse_loss
+            return mse_loss
         
         return total_loss
