@@ -13,6 +13,9 @@ experiments/hybrid_v1_*/
 experiments/hybrid_v2_*/
 experiments/hybrid_v3_*/
 experiments/transformer_*/
+experiments/results_summary.csv
+experiments/runs_comparison_*.csv
+experiments/runs_comparison_*.json
 
 # Keep structure directories empty
 !experiments/checkpoints/.gitkeep
