@@ -113,7 +113,8 @@ def print_summary(runs, sort_by="duration_min"):
     if len(df) < original_count:
         print(f"⚠ Removed {original_count - len(df)} duplicate entries")
     
-    print(f"After dedup: {len(df)} rows\n")
+    print(f"After dedup: {len(df)} rows")
+    print(f"DataFrame columns: {list(df.columns)}\n")
     
     # Fill None/NaN with "—" for display
     df_display = df.fillna("—").reset_index(drop=True)
@@ -157,16 +158,25 @@ def print_summary(runs, sort_by="duration_min"):
         ("c50_mae", "Best C50 MAE")
     ]
     
+    any_metrics_found = False
     for metric, label in metrics_to_track:
         if metric in df.columns:
             # Convert to numeric, ignoring errors
             numeric_vals = pd.to_numeric(df[metric], errors='coerce')
             if numeric_vals.notna().any():  # If there's at least one numeric value
+                any_metrics_found = True
                 best_idx = numeric_vals.idxmin()
                 best_val = numeric_vals[best_idx]
                 if pd.notna(best_val):
                     run_id = df.loc[best_idx, 'run_id']
                     print(f"  {label:25s}: {run_id:35s} ({best_val:.4f})")
+    
+    if not any_metrics_found:
+        print("  ℹ️  Metrics only available for runs created after 2026-01-21")
+        print("     Showing all runs by epoch count instead:\n")
+        # Show latest runs (which should have metrics)
+        for idx, row in df.sort_values('epochs', ascending=False).head(5).iterrows():
+            print(f"  - {row['run_id']}: {int(row['epochs'])} epochs, {row['model']}, {row['loss_type'] if row['loss_type'] != '—' else 'MSE'}")
 
 
 def export_results(runs, format="csv"):
