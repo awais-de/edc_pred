@@ -26,14 +26,19 @@ def load_all_runs(experiments_dir="experiments"):
     
     errors = []
     found_runs = 0
+    checked_dirs = 0
     
-    # Find all subdirectories with metadata.json
+    # Find all subdirectories with metadata.json (only direct children of experiments/)
     for run_dir in sorted(experiments_path.iterdir()):
         if not run_dir.is_dir():
             continue
         
+        checked_dirs += 1
         metadata_file = run_dir / "metadata.json"
+        
+        # Only process if metadata.json exists in this directory
         if not metadata_file.exists():
+            # Skip subdirectories without metadata.json
             continue
         
         try:
@@ -78,7 +83,13 @@ def load_all_runs(experiments_dir="experiments"):
         for error in errors:
             print(error)
     
-    print(f"\n✓ Loaded {found_runs} valid runs from experiments/")
+    print(f"\n✓ Checked {checked_dirs} directories, loaded {found_runs} valid runs")
+    
+    # DEBUG: Show what we actually loaded
+    if found_runs > 0:
+        print(f"   Loaded run IDs: {[r['run_id'] for r in runs]}\n")
+    else:
+        print("   WARNING: No runs found with complete metadata!\n")
     
     return runs
 
@@ -89,7 +100,20 @@ def print_summary(runs, sort_by="duration_min"):
         print("No runs found.")
         return
     
+    print(f"\nCreating DataFrame with {len(runs)} runs...")
+    
     df = pd.DataFrame(runs)
+    
+    print(f"DataFrame shape: {df.shape}")
+    print(f"Unique run_ids: {df['run_id'].nunique()}")
+    
+    # Remove duplicate rows (in case of duplicate runs in the list)
+    original_count = len(df)
+    df = df.drop_duplicates(subset=['run_id'])
+    if len(df) < original_count:
+        print(f"⚠ Removed {original_count - len(df)} duplicate entries")
+    
+    print(f"After dedup: {len(df)} rows\n")
     
     # Fill None/NaN with "—" for display
     df_display = df.fillna("—")
@@ -115,8 +139,8 @@ def print_summary(runs, sort_by="duration_min"):
     # Only include columns that exist
     display_cols = [col for col in display_cols if col in df_display.columns]
     
-    print("\n" + "="*180)
-    print("TRAINING RUNS COMPARISON")
+    print("="*180)
+    print(f"TRAINING RUNS COMPARISON ({len(df)} runs)")
     print("="*180)
     print(df_display[display_cols].to_string(index=False))
     print("="*180)
