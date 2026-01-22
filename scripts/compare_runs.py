@@ -25,6 +25,7 @@ def load_all_runs(experiments_dir="experiments"):
         return runs
     
     errors = []
+    found_runs = 0
     
     # Find all subdirectories with metadata.json
     for run_dir in sorted(experiments_path.iterdir()):
@@ -65,6 +66,7 @@ def load_all_runs(experiments_dir="experiments"):
                     run_info[f"{metric_type}_r2"] = metric_data.get("r2")
             
             runs.append(run_info)
+            found_runs += 1
         
         except json.JSONDecodeError as e:
             errors.append(f"  ⚠ {run_dir.name}: JSON parsing error ({str(e)[:60]})")
@@ -75,6 +77,8 @@ def load_all_runs(experiments_dir="experiments"):
         print("\n⚠ Skipped malformed runs:")
         for error in errors:
             print(error)
+    
+    print(f"\n✓ Loaded {found_runs} valid runs from experiments/")
     
     return runs
 
