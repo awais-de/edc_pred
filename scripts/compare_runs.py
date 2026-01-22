@@ -116,16 +116,18 @@ def print_summary(runs, sort_by="duration_min"):
     print(f"After dedup: {len(df)} rows\n")
     
     # Fill None/NaN with "—" for display
-    df_display = df.fillna("—")
+    df_display = df.fillna("—").reset_index(drop=True)
     
     # Sort by specified metric (only if column exists and has numeric values)
     if sort_by in df.columns:
         # Try to sort by numeric values, ignoring non-numeric
         try:
             numeric_df = pd.to_numeric(df[sort_by], errors='coerce')
-            sort_indices = numeric_df.argsort()
-            df_display = df_display.iloc[sort_indices]
-        except:
+            # Only sort if there's at least one valid numeric value
+            if numeric_df.notna().any():
+                sort_indices = numeric_df.argsort(kind='stable')
+                df_display = df_display.iloc[sort_indices].reset_index(drop=True)
+        except Exception as e:
             # If sorting fails, just use original order
             pass
     
