@@ -367,16 +367,34 @@ def main():
     # Save metadata
     metadata = {
         "model_name": args.model,
+        "timestamp": timestamp,
         "model_parameters": {
             "total": int(total_params),
             "trainable": int(trainable_params)
         },
         "training_config": {
             "max_epochs": int(args.max_epochs),
-            "batch_size": int(args.batch_size),
-            "learning_rate": float(args.learning_rate),
             "actual_epochs": int(trainer.current_epoch + 1),
-            "training_duration_seconds": float(train_duration)
+            "batch_size": int(args.batch_size),
+            "eval_batch_size": int(args.eval_batch_size) if args.eval_batch_size else int(args.batch_size),
+            "learning_rate": float(args.learning_rate),
+            "training_duration_seconds": float(train_duration),
+            "training_duration_minutes": float(train_duration / 60)
+        },
+        "loss_config": {
+            "loss_type": args.loss_type,
+            "gradient_clip_val": args.gradient_clip_val,
+            "aux_weight": args.aux_weight if args.loss_type == "auxiliary" else None
+        },
+        "precision_config": {
+            "precision": int(precision_to_use),
+            "mixed_precision_enabled": not args.no_mixed_precision
+        },
+        "data_loader_config": {
+            "num_workers": int(args.num_workers),
+            "pin_memory": args.pin_memory,
+            "persistent_workers": args.persistent_workers,
+            "scaler_type": args.scaler_type
         },
         "data_config": {
             "num_samples": int(args.max_samples),
@@ -384,10 +402,16 @@ def main():
             "output_length": int(edc_data.shape[1]),
             "train_size": int(len(train_loader.dataset)),
             "val_size": int(len(val_loader.dataset)),
-            "test_size": int(len(test_loader.dataset))
+            "test_size": int(len(test_loader.dataset)),
+            "train_ratio": float(args.train_ratio),
+            "val_ratio": float(args.val_ratio)
+        },
+        "early_stopping_config": {
+            "enabled": not args.disable_early_stop,
+            "patience": int(args.early_stop_patience) if not args.disable_early_stop else None,
+            "stopped_at_epoch": int(trainer.current_epoch + 1) if (trainer.current_epoch + 1) < args.max_epochs else args.max_epochs
         },
         "metrics": metrics_serializable,
-        "timestamp": timestamp,
         "best_model_path": str(checkpoint.best_model_path)
     }
     
