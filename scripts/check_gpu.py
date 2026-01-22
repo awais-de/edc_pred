@@ -16,8 +16,9 @@ try:
     result = subprocess.run(
         ['nvidia-smi', '--query-gpu=name,memory.total,memory.free,memory.used',
          '--format=csv,noheader,nounits'],
-        capture_output=True,
-        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
         check=True
     )
     
