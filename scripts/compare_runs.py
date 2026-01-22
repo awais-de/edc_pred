@@ -4,7 +4,7 @@ Compare all training runs and generate a summary report.
 Usage:
     python scripts/compare_runs.py [--sort-by metric] [--export csv/json]
 
-Reads metadata.json from all experiment directories and produces a comparison table.
+Reads metadata.json from all experiment directories and computes metrics from predictions.npy
 """
 
 import os
@@ -13,10 +13,20 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
+import numpy as np
+from sys import path as sys_path
+
+# Add src to path for importing metrics module
+sys_path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+try:
+    from evaluation.metrics import evaluate_model
+except ImportError:
+    evaluate_model = None
 
 
 def load_all_runs(experiments_dir="experiments"):
-    """Load metadata from all completed runs."""
+    """Load metadata from all completed runs and compute/extract metrics."""
     runs = []
     
     experiments_path = Path(experiments_dir)
@@ -61,14 +71,41 @@ def load_all_runs(experiments_dir="experiments"):
                 "early_stop_patience": metadata.get("early_stopping_config", {}).get("patience"),
             }
             
-            # Add metrics (flatten nested dict)
+            # Try to load metrics from metadata.json first
+            metrics_loaded_from_file = False
             metrics = metadata.get("metrics", {})
-            for metric_type in ["overall_edc", "edt", "t20", "c50"]:
-                if metric_type in metrics:
-                    metric_data = metrics[metric_type]
-                    run_info[f"{metric_type}_mae"] = metric_data.get("mae")
-                    run_info[f"{metric_type}_rmse"] = metric_data.get("rmse")
-                    run_info[f"{metric_type}_r2"] = metric_data.get("r2")
+            if metrics:
+                for metric_type in ["overall_edc", "edt", "t20", "c50"]:
+                    if metric_type in metrics:
+                        metric_data = metrics[metric_type]
+                        run_info[f"{metric_type}_mae"] = metric_data.get("mae")
+                        run_info[f"{metric_type}_rmse"] = metric_data.get("rmse")
+                        run_info[f"{metric_type}_r2"] = metric_data.get("r2")
+                metrics_loaded_from_file = True
+            
+            # If metrics not in metadata, try to compute from predictions.npy and targets.npy
+            if not metrics_loaded_from_file and evaluate_model:
+                preds_file = run_dir / "predictions.npy"
+                targets_file = run_dir / "targets.npy"
+                
+                if preds_file.exists() and targets_file.exists():
+                    try:
+                        preds = np.load(preds_file)
+                        targets = np.load(targets_file)
+                        
+                        # Compute metrics using the evaluation module
+                        computed_metrics = evaluate_model(targets, preds, compute_acoustic=True)
+                        
+                        # Add computed metrics to run_info
+                        for metric_type in ["overall_edc", "edt", "t20", "c50"]:
+                            if metric_type in computed_metrics:
+                                metric_data = computed_metrics[metric_type]
+                                run_info[f"{metric_type}_mae"] = metric_data.get("mae")
+                                run_info[f"{metric_type}_rmse"] = metric_data.get("rmse")
+                                run_info[f"{metric_type}_r2"] = metric_data.get("r2")
+                    except Exception as e:
+                        # Metrics computation failed, continue without them
+                        pass
             
             runs.append(run_info)
             found_runs += 1
