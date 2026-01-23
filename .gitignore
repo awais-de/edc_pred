@@ -58,3 +58,5 @@ build/
 lstm_paper.pdf
 COMPARATIVE_ANALYSIS.md
 RESULTS_ANALYSIS.md
+experiments/multihead_20260123_120009.zip
+.DS_Store
