@@ -12,6 +12,7 @@ experiments/lstm_*/
 experiments/hybrid_v1_*/
 experiments/hybrid_v2_*/
 experiments/hybrid_v3_*/
+experiments/multihead_*/
 experiments/transformer_*/
 experiments/results_summary.csv
 experiments/runs_comparison_*.csv
@@ -21,6 +22,7 @@ experiments/runs_comparison_*.json
 run1_conservative.log
 run2_moderate.log
 run3_aggressive.log
+run_multihead.log
 
 # Keep structure directories empty
 !experiments/checkpoints/.gitkeep
