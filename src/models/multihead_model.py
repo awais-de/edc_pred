@@ -4,7 +4,25 @@ Multi-Head CNN-LSTM model for simultaneous EDC, T20, and C50 prediction.
 
 import torch
 import torch.nn as nn
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from .base_model import BaseEDCModel
+
+
+class HuberLoss(nn.Module):
+    """Huber loss - robust to outliers."""
+    def __init__(self, delta=0.1):
+        super().__init__()
+        self.delta = delta
+    
+    def forward(self, pred, target):
+        error = torch.abs(pred - target)
+        cond = error < self.delta
+        loss = torch.where(
+            cond,
+            0.5 * error ** 2,
+            self.delta * (error - 0.5 * self.delta)
+        )
+        return loss.mean()
 
 
 class CNNLSTMMultiHead(BaseEDCModel):
@@ -101,6 +119,27 @@ class CNNLSTMMultiHead(BaseEDCModel):
         
         # Multi-task loss
         self.criterion = nn.MSELoss(reduction='none')  # We'll weight manually
+        self.huber_loss = HuberLoss(delta=0.1)  # Robust T20 loss
+    
+    def configure_optimizers(self):
+        """Configure optimizer with learning rate scheduler."""
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        
+        # Cosine annealing scheduler: gradually reduce LR from initial to very small
+        scheduler = CosineAnnealingLR(
+            optimizer,
+            T_max=200,  # Total epochs
+            eta_min=1e-5  # Minimum learning rate
+        )
+        
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'interval': 'epoch',
+                'frequency': 1
+            }
+        }
     
     def _build_criterion(self):
         """Build criterion (already done in __init__)."""
@@ -166,7 +205,8 @@ class CNNLSTMMultiHead(BaseEDCModel):
         
         # Compute losses
         loss_edc = self.criterion(outputs['edc'], y_edc).mean()
-        loss_t20 = self.criterion(outputs['t20'], y_t20).mean()
+        # Use Huber loss for T20 (robust to outliers)
+        loss_t20 = self.huber_loss(outputs['t20'], y_t20)
         loss_c50 = self.criterion(outputs['c50'], y_c50).mean()
         
         # Weighted combination
@@ -200,7 +240,8 @@ class CNNLSTMMultiHead(BaseEDCModel):
         
         # Compute losses
         loss_edc = self.criterion(outputs['edc'], y_edc).mean()
-        loss_t20 = self.criterion(outputs['t20'], y_t20).mean()
+        # Use Huber loss for T20
+        loss_t20 = self.huber_loss(outputs['t20'], y_t20)
         loss_c50 = self.criterion(outputs['c50'], y_c50).mean()
         
         # Weighted combination
