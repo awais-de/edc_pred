@@ -6,7 +6,6 @@ Matches reference paper style: decay curves, scatter plots, error distributions.
 Usage:
   python scripts/plot_results.py --run-dir experiments/multihead_20260123_120009
 """
-from __future__ import annotations
 from pathlib import Path
 import argparse
 import sys
@@ -66,7 +65,7 @@ def pick_indices_by_error(y_true: np.ndarray, y_pred: np.ndarray, n: int = 3) ->
     return [low, med, high]
 
 
-def load_arrays(run_dir: Path) -> Dict[str, np.ndarray]:
+def load_arrays(run_dir):
     """Load prediction and target arrays."""
     arrays = {}
     for name in [
@@ -84,7 +83,7 @@ def load_arrays(run_dir: Path) -> Dict[str, np.ndarray]:
     return arrays
 
 
-def compute_metrics(t_true, t_pred) -> Dict[str, float]:
+def compute_metrics(t_true, t_pred):
     """Compute MAE, RMSE, R² metrics."""
     return {
         "mae": mean_absolute_error(t_true, t_pred),
