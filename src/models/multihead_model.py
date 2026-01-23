@@ -101,6 +101,10 @@ class CNNLSTMMultiHead(BaseEDCModel):
         # Multi-task loss
         self.criterion = nn.MSELoss(reduction='none')  # We'll weight manually
     
+    def _build_criterion(self):
+        """Build criterion (already done in __init__)."""
+        pass  # Criterion is already set in __init__
+    
     def forward(self, x: torch.Tensor) -> dict:
         """
         Forward pass.
