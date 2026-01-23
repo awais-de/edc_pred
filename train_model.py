@@ -268,7 +268,9 @@ def main():
         model.criterion.t20_weight = args.t20_weight
         model.criterion.c50_weight = args.c50_weight
         print(f"  Weighted EDC loss weights set to: EDT={args.edt_weight}, T20={args.t20_weight}, C50={args.c50_weight}")
-        total_params = sum(p.numel() for p in model.parameters())
+    
+    # Calculate parameter counts
+    total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
     print(f"✓ Initialized {args.model} model")
