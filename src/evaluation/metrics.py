@@ -187,3 +187,67 @@ def print_metrics(metrics: Dict[str, float]) -> None:
         print(f"  R²:   {metrics['c50_r2']:.6f}")
     
     print("\n" + "="*50)
+
+
+def evaluate_multioutput_model(
+    y_edc_true: np.ndarray,
+    y_edc_pred: np.ndarray,
+    y_t20_true: np.ndarray,
+    y_t20_pred: np.ndarray,
+    y_c50_true: np.ndarray,
+    y_c50_pred: np.ndarray,
+    scaler_edc = None,
+    scaler_t20 = None,
+    scaler_c50 = None
+) -> Dict[str, float]:
+    """
+    Evaluate multi-output model predictions.
+    
+    Args:
+        y_edc_true: Ground truth EDCs (batch, seq_len)
+        y_edc_pred: Predicted EDCs (batch, seq_len)
+        y_t20_true: Ground truth T20 values (batch,)
+        y_t20_pred: Predicted T20 values (batch,)
+        y_c50_true: Ground truth C50 values (batch,)
+        y_c50_pred: Predicted C50 values (batch,)
+        scaler_edc: Scaler to inverse transform EDC (optional)
+        scaler_t20: Scaler to inverse transform T20 (optional)
+        scaler_c50: Scaler to inverse transform C50 (optional)
+        
+    Returns:
+        Dictionary of metrics for all outputs
+    """
+    # Inverse transform if scalers provided
+    if scaler_edc is not None:
+        y_edc_true = scaler_edc.inverse_transform(y_edc_true)
+        y_edc_pred = scaler_edc.inverse_transform(y_edc_pred)
+    
+    if scaler_t20 is not None:
+        y_t20_true = scaler_t20.inverse_transform(y_t20_true.reshape(-1, 1)).flatten()
+        y_t20_pred = scaler_t20.inverse_transform(y_t20_pred.reshape(-1, 1)).flatten()
+    
+    if scaler_c50 is not None:
+        y_c50_true = scaler_c50.inverse_transform(y_c50_true.reshape(-1, 1)).flatten()
+        y_c50_pred = scaler_c50.inverse_transform(y_c50_pred.reshape(-1, 1)).flatten()
+    
+    # EDC metrics
+    y_edc_true_flat = y_edc_true.flatten()
+    y_edc_pred_flat = y_edc_pred.flatten()
+    
+    metrics = {
+        "edc_mae": mean_absolute_error(y_edc_true_flat, y_edc_pred_flat),
+        "edc_rmse": np.sqrt(mean_squared_error(y_edc_true_flat, y_edc_pred_flat)),
+        "edc_r2": r2_score(y_edc_true_flat, y_edc_pred_flat),
+    }
+    
+    # T20 metrics
+    metrics["t20_mae"] = mean_absolute_error(y_t20_true, y_t20_pred)
+    metrics["t20_rmse"] = np.sqrt(mean_squared_error(y_t20_true, y_t20_pred))
+    metrics["t20_r2"] = r2_score(y_t20_true, y_t20_pred)
+    
+    # C50 metrics
+    metrics["c50_mae"] = mean_absolute_error(y_c50_true, y_c50_pred)
+    metrics["c50_rmse"] = np.sqrt(mean_squared_error(y_c50_true, y_c50_pred))
+    metrics["c50_r2"] = r2_score(y_c50_true, y_c50_pred)
+    
+    return metrics

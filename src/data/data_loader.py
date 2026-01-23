@@ -36,6 +36,76 @@ class EDCDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
+class EDCMultiOutputDataset(Dataset):
+    """PyTorch Dataset for multi-output EDC data (EDC + T20 + C50)."""
+    
+    def __init__(self, X: np.ndarray, y_edc: np.ndarray, y_t20: np.ndarray, y_c50: np.ndarray):
+        """
+        Initialize dataset.
+        
+        Args:
+            X: Input features (room features)
+            y_edc: Target EDCs
+            y_t20: Target T20 values
+            y_c50: Target C50 values
+        """
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y_edc = torch.tensor(y_edc, dtype=torch.float32)
+        self.y_t20 = torch.tensor(y_t20, dtype=torch.float32)
+        self.y_c50 = torch.tensor(y_c50, dtype=torch.float32)
+        
+        assert len(self.X) == len(self.y_edc) == len(self.y_t20) == len(self.y_c50), "Mismatched data lengths"
+    
+    def __len__(self):
+        return len(self.X)
+    
+    def __getitem__(self, idx):
+        return self.X[idx], self.y_edc[idx], self.y_t20[idx], self.y_c50[idx]
+
+
+def compute_t20_c50_from_edc(edc: np.ndarray, sample_rate: int = 48000) -> Tuple[float, float]:
+    """
+    Compute T20 and C50 from EDC curve.
+    
+    Args:
+        edc: Energy Decay Curve (1D array)
+        sample_rate: Sampling rate in Hz
+        
+    Returns:
+        Tuple of (t20, c50) values
+    """
+    # Normalize EDC to start at 0 dB
+    if edc.max() <= 0:
+        edc_db = edc.copy()
+    else:
+        edc_db = 10 * np.log10(np.maximum(edc, 1e-10) / edc.max())
+    
+    time_s = np.arange(len(edc)) / sample_rate
+    
+    # T20: Time to decay from -5 to -25 dB (extrapolated to 60 dB)
+    idx_5db = np.where(edc_db <= -5)[0]
+    idx_25db = np.where(edc_db <= -25)[0]
+    
+    if len(idx_5db) > 0 and len(idx_25db) > 0:
+        time_5db = time_s[idx_5db[0]]
+        time_25db = time_s[idx_25db[0]]
+        t20 = 3 * (time_25db - time_5db)
+    else:
+        t20 = 0.0  # Default fallback
+    
+    # C50: Clarity index (energy in first 50ms / total energy after 50ms)
+    idx_50ms = np.argmin(np.abs(time_s - 0.05))
+    early_energy = np.sum(edc[:idx_50ms])
+    late_energy = np.sum(edc[idx_50ms:])
+    
+    if late_energy > 0 and early_energy > 0:
+        c50 = 10 * np.log10(early_energy / late_energy)
+    else:
+        c50 = 0.0  # Default fallback
+    
+    return t20, c50
+
+
 def extract_rir_case(fname: str) -> Tuple[int, int]:
     """
     Extract RIR number and case number from filename.
@@ -248,3 +318,109 @@ def create_dataloaders(
     )
     
     return train_loader, val_loader, test_loader
+
+
+def create_multioutput_dataloaders(
+    X: np.ndarray,
+    y_edc: np.ndarray,
+    batch_size: int = 8,
+    train_ratio: float = 0.6,
+    val_ratio: float = 0.2,
+    random_state: int = 42,
+    input_reshape: bool = True,
+    num_workers: int = 0,
+    pin_memory: bool = False,
+    persistent_workers: bool = False,
+    sample_rate: int = 48000,
+    verbose: bool = True
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    """
+    Create train/val/test dataloaders for multi-output (EDC + T20 + C50).
+    
+    Args:
+        X: Input features
+        y_edc: Target EDC curves
+        batch_size: Batch size
+        train_ratio: Proportion for training
+        val_ratio: Proportion for validation (remainder is test)
+        random_state: Random seed
+        input_reshape: Whether to reshape X to (batch, 1, features)
+        num_workers: Dataloader workers for background loading
+        pin_memory: Pin CPU memory for faster H2D transfer
+        persistent_workers: Keep workers alive between epochs
+        sample_rate: Sampling rate for acoustic parameter calculation
+        verbose: Print progress
+        
+    Returns:
+        Tuple of (train_loader, val_loader, test_loader)
+    """
+    if verbose:
+        print("Computing T20 and C50 values from EDC curves...")
+    
+    # Compute T20 and C50 for all samples
+    y_t20 = []
+    y_c50 = []
+    
+    for i, edc in enumerate(y_edc):
+        t20, c50 = compute_t20_c50_from_edc(edc, sample_rate)
+        y_t20.append(t20)
+        y_c50.append(c50)
+        
+        if verbose and (i + 1) % 1000 == 0:
+            print(f"  Processed {i + 1}/{len(y_edc)} EDC curves")
+    
+    y_t20 = np.array(y_t20, dtype=np.float32)
+    y_c50 = np.array(y_c50, dtype=np.float32)
+    
+    if verbose:
+        print(f"  T20 range: [{y_t20.min():.4f}, {y_t20.max():.4f}], mean: {y_t20.mean():.4f}")
+        print(f"  C50 range: [{y_c50.min():.4f}, {y_c50.max():.4f}], mean: {y_c50.mean():.4f}")
+    
+    # Reshape input if needed
+    if input_reshape and len(X.shape) == 2:
+        X = X.reshape((-1, 1, X.shape[1]))
+    
+    # Train/val/test split
+    test_ratio = 1.0 - train_ratio - val_ratio
+    X_temp, X_test, y_edc_temp, y_edc_test, y_t20_temp, y_t20_test, y_c50_temp, y_c50_test = train_test_split(
+        X, y_edc, y_t20, y_c50, test_size=test_ratio, random_state=random_state
+    )
+    
+    val_ratio_adjusted = val_ratio / (train_ratio + val_ratio)
+    X_train, X_val, y_edc_train, y_edc_val, y_t20_train, y_t20_val, y_c50_train, y_c50_val = train_test_split(
+        X_temp, y_edc_temp, y_t20_temp, y_c50_temp, test_size=val_ratio_adjusted, random_state=random_state
+    )
+    
+    # Create datasets
+    train_dataset = EDCMultiOutputDataset(X_train, y_edc_train, y_t20_train, y_c50_train)
+    val_dataset = EDCMultiOutputDataset(X_val, y_edc_val, y_t20_val, y_c50_val)
+    test_dataset = EDCMultiOutputDataset(X_test, y_edc_test, y_t20_test, y_c50_test)
+    
+    # Create loaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers and num_workers > 0,
+    )
+    
+    return train_loader, val_loader, test_loader
+
