@@ -90,9 +90,10 @@ class CNNLSTMMultiHead(BaseEDCModel):
         self.edc_fc1 = nn.Linear(fc_hidden_dim, fc_hidden_dim // 2)
         self.edc_fc2 = nn.Linear(fc_hidden_dim // 2, target_length)
         
-        # T20 head
-        self.t20_fc1 = nn.Linear(fc_hidden_dim, 256)
-        self.t20_fc2 = nn.Linear(256, 1)
+        # T20 head (Enhanced: 2x wider + extra layer for better T20 prediction)
+        self.t20_fc1 = nn.Linear(fc_hidden_dim, 512)
+        self.t20_fc2 = nn.Linear(512, 256)
+        self.t20_fc3 = nn.Linear(256, 1)
         
         # C50 head
         self.c50_fc1 = nn.Linear(fc_hidden_dim, 256)
@@ -141,7 +142,9 @@ class CNNLSTMMultiHead(BaseEDCModel):
         # T20 head
         t20 = torch.relu(self.t20_fc1(shared))
         t20 = self.dropout(t20)
-        t20_out = self.t20_fc2(t20)  # shape: (batch_size, 1)
+        t20 = torch.relu(self.t20_fc2(t20))
+        t20 = self.dropout(t20)
+        t20_out = self.t20_fc3(t20)  # shape: (batch_size, 1)
         
         # C50 head
         c50 = torch.relu(self.c50_fc1(shared))
