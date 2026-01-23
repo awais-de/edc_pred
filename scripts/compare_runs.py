@@ -217,37 +217,70 @@ def load_all_runs(experiments_dir="experiments"):
             metrics_loaded_from_file = False
             metrics = metadata.get("metrics", {})
             if metrics:
-                for metric_type in ["overall_edc", "edt", "t20", "c50"]:
+                # Check for both old format (overall_edc) and new format (edc_mae)
+                for metric_type in ["overall_edc", "edc", "edt", "t20", "c50"]:
                     if metric_type in metrics:
                         metric_data = metrics[metric_type]
-                        run_info[f"{metric_type}_mae"] = metric_data.get("mae")
-                        run_info[f"{metric_type}_rmse"] = metric_data.get("rmse")
-                        run_info[f"{metric_type}_r2"] = metric_data.get("r2")
+                        # Normalize key names
+                        key_prefix = "overall_edc" if metric_type == "overall_edc" else metric_type
+                        run_info[f"{key_prefix}_mae"] = metric_data.get("mae")
+                        run_info[f"{key_prefix}_rmse"] = metric_data.get("rmse")
+                        run_info[f"{key_prefix}_r2"] = metric_data.get("r2")
+                    # Also check for direct mae/rmse/r2 keys (multihead format)
+                    elif f"{metric_type}_mae" in metrics:
+                        run_info[f"{metric_type}_mae"] = metrics.get(f"{metric_type}_mae")
+                        run_info[f"{metric_type}_rmse"] = metrics.get(f"{metric_type}_rmse")
+                        run_info[f"{metric_type}_r2"] = metrics.get(f"{metric_type}_r2")
                 metrics_loaded_from_file = True
             
-            # If metrics not in metadata, try to compute from predictions.npy and targets.npy
+            # If metrics not in metadata, try to compute from prediction files
             if not metrics_loaded_from_file:
-                preds_file = run_dir / "predictions.npy"
-                targets_file = run_dir / "targets.npy"
+                # Check for multihead format (separate files)
+                multihead_files = {
+                    "edc": (run_dir / "edc_predictions.npy", run_dir / "edc_targets.npy"),
+                    "t20": (run_dir / "t20_predictions.npy", run_dir / "t20_targets.npy"),
+                    "c50": (run_dir / "c50_predictions.npy", run_dir / "c50_targets.npy"),
+                }
                 
-                if preds_file.exists() and targets_file.exists():
-                    try:
-                        preds = np.load(preds_file)
-                        targets = np.load(targets_file)
-                        
-                        # Compute metrics using the simple function
-                        computed_metrics = compute_metrics_simple(targets, preds)
-                        
-                        # Add computed metrics to run_info
-                        for metric_type in ["overall_edc", "edt", "t20", "c50"]:
-                            if metric_type in computed_metrics:
-                                metric_data = computed_metrics[metric_type]
-                                run_info[f"{metric_type}_mae"] = metric_data.get("mae")
-                                run_info[f"{metric_type}_rmse"] = metric_data.get("rmse")
-                                run_info[f"{metric_type}_r2"] = metric_data.get("r2")
-                    except Exception as e:
-                        # Metrics computation failed, continue without them
-                        pass
+                is_multihead = all(pred.exists() and tgt.exists() for pred, tgt in multihead_files.values())
+                
+                if is_multihead:
+                    # Load multihead predictions
+                    for metric_type, (pred_file, tgt_file) in multihead_files.items():
+                        try:
+                            preds = np.load(pred_file)
+                            targets = np.load(tgt_file)
+                            
+                            # Flatten if needed
+                            preds_flat = preds.flatten()
+                            targets_flat = targets.flatten()
+                            
+                            # Compute metrics
+                            run_info[f"{metric_type}_mae"] = mean_absolute_error(targets_flat, preds_flat)
+                            run_info[f"{metric_type}_rmse"] = np.sqrt(mean_squared_error(targets_flat, preds_flat))
+                            run_info[f"{metric_type}_r2"] = r2_score(targets_flat, preds_flat)
+                        except Exception as e:
+                            errors.append(f"  ⚠ {run_dir.name}: Failed to load {metric_type} ({str(e)[:40]})")
+                else:
+                    # Try old single-output format
+                    preds_file = run_dir / "predictions.npy"
+                    targets_file = run_dir / "targets.npy"
+                    
+                    if preds_file.exists() and targets_file.exists():
+                        try:
+                            preds = np.load(preds_file)
+                            targets = np.load(targets_file)
+                            
+                            # Flatten for overall metrics
+                            preds_flat = preds.flatten()
+                            targets_flat = targets.flatten()
+                            
+                            # Compute overall EDC metrics
+                            run_info["overall_edc_mae"] = mean_absolute_error(targets_flat, preds_flat)
+                            run_info["overall_edc_rmse"] = np.sqrt(mean_squared_error(targets_flat, preds_flat))
+                            run_info["overall_edc_r2"] = r2_score(targets_flat, preds_flat)
+                        except Exception as e:
+                            pass  # Continue without metrics
             
             runs.append(run_info)
             found_runs += 1
@@ -315,7 +348,8 @@ def print_summary(runs, sort_by="duration_min"):
     display_cols = [
         "run_id", "model", "loss_type", "batch_size", "epochs", 
         "duration_min", "precision", "gradient_clip", "aux_weight",
-        "overall_edc_mae", "edt_mae", "t20_mae", "c50_mae"
+        "overall_edc_mae", "edc_mae", "edt_mae", "t20_mae", "c50_mae",
+        "edc_r2", "t20_r2", "c50_r2"
     ]
     
     # Only include columns that exist
@@ -331,10 +365,14 @@ def print_summary(runs, sort_by="duration_min"):
     print("\n🏆 BEST PERFORMERS:\n")
     metrics_to_track = [
         ("duration_min", "Fastest"),
-        ("overall_edc_mae", "Best Overall EDC MAE"),
+        ("overall_edc_mae", "Best Overall EDC MAE (single-output)"),
+        ("edc_mae", "Best EDC MAE (multihead)"),
         ("edt_mae", "Best EDT MAE"),
         ("t20_mae", "Best T20 MAE"),
-        ("c50_mae", "Best C50 MAE")
+        ("c50_mae", "Best C50 MAE"),
+        ("edc_r2", "Best EDC R²"),
+        ("t20_r2", "Best T20 R²"),
+        ("c50_r2", "Best C50 R²"),
     ]
     
     any_metrics_found = False
