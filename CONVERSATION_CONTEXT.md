@@ -33,25 +33,24 @@
 
 ### Current Status: 2/4 Targets Met
 - ✅ EDT MAE: 0.004 (5× better than target)
-- ✅ Overall R²: 0.995 (target: 0.98)
-- ❌ T20 MAE: 0.065 (3.2× over target)
-- ❌ C50 MAE: 1.451 (1.6× over target)
-
+# MASTER PROJECT CONTEXT & PROGRESS DOCUMENT
+**EDC Prediction Deep Learning Project — Final Status**  
+**Last Updated:** January 23, 2026 (14:30 UTC)  
+**Current Best Model:** experiments/multihead_20260123_120009  
+**Grade:** B/B+ (77% of evaluation criteria met)  
 ---
-
 ## PROBLEM ANALYSIS & ROOT CAUSES
 
-### Issue 1: 7-Hour Training Failure (Batch Size 2)
-
-**Symptoms:**
-- Training took 442 minutes (7+ hours)
-- Val_loss: 815 (epoch 70) → 1380+ (epoch 120) - diverged catastrophically
-- Overall MAE degraded from ~0.002 to 0.250 (125× worse)
-- Run: `hybrid_v2_20260122_020157`
-
-**Root Causes:**
+1. [Executive Summary](#executive-summary)
+2. [Journey: Crisis → Solution](#journey-crisis--solution)
+3. [Architecture Evolution](#architecture-evolution)
+4. [Best Results & Comparison](#best-results--comparison)
+5. [Key Innovations](#key-innovations)
+6. [Bottleneck Analysis](#bottleneck-analysis)
+7. [Documentation Created](#documentation-created)
+8. [Tools & Scripts Updated](#tools--scripts-updated)
+9. [Reproducibility & Next Steps](#reproducibility--next-steps)
 1. **Batch size 2** caused 4× more batches per epoch (2400 vs 600)
-   - Normal: 600 batches/epoch × 111 epochs = 67k total batches
    - Batch 2: 2400 batches/epoch × 51 epochs = 122k total batches
    - 6× longer total training time
 
@@ -77,16 +76,11 @@
 - Weighted EDC loss with 1.5× weights prioritizes overall EDC fit
 - Doesn't provide strong enough signal for acoustic parameter optimization
 - T20/C50 are harder to predict with generic weighting
-
 ---
 
 ## SOLUTIONS IMPLEMENTED
 
 ### Solution 1: Stabilized AuxiliaryAcousticLoss
-
-**File:** `src/models/lstm_model.py` (AuxiliaryAcousticLoss class)
-
-**Changes:**
 - Reduced softmax temperature: 2.0 → 1.0 (gentler gradient flow)
 - Stricter clamping:
   - edc_db: clamped to [-60, 0]
@@ -95,70 +89,49 @@
 - Reduced default aux_weight: 0.3 → 0.1 (lower loss component imbalance)
 - Added input clamping and loss component limits (max 1e4)
 - Added Inf checking and fallback to MSE
-- Normalized auxiliary loss: 0.5×(T20+C50) instead of 1.0×each
 
 ### Solution 2: Added CLI Stability Flags
 
 **File:** `train_model.py`
 
-**New Arguments:**
-```python
---gradient-clip-val FLOAT     # Gradient clipping threshold (1.0 recommended)
 --aux-weight FLOAT            # Auxiliary loss weight (0.1 recommended)
 --no-mixed-precision          # Force 32-bit precision (disable 16-bit)
 --edt-weight FLOAT            # EDT weight in weighted_edc loss (1.5 default)
 --t20-weight FLOAT            # T20 weight in weighted_edc loss (1.5 default)
 --c50-weight FLOAT            # C50 weight in weighted_edc loss (1.5 default)
-```
 
 **Implementation:**
 - Arguments parsed and applied to model.criterion
 - Saved in metadata.json for tracking
 - Allows flexible weight tuning without code changes
 
-### Solution 3: Enhanced Metadata Tracking
-
 **File:** `train_model.py` (metadata.json saving)
-
-**New Sections:**
 ```json
 {
   "model_name": "hybrid_v2",
   "timestamp": "20260122_112451",
   "training_config": {
-    "max_epochs": 200,
     "actual_epochs": 200,
     "batch_size": 8,
     "training_duration_minutes": 189.92
   },
   "loss_config": {
-    "loss_type": "weighted_edc",
-    "gradient_clip_val": 1.0,
     "edt_weight": 1.5,
     "t20_weight": 1.5,
     "c50_weight": 1.5
   },
   "precision_config": {
-    "precision": 16,
-    "mixed_precision_enabled": true
-  }
 }
 ```
 
-### Solution 4: Created Run Comparison Tools
 
 **Files Created:**
 1. `scripts/check_results.py` - Audits which runs have complete files
 2. `scripts/extract_metrics.py` - Computes metrics from predictions/targets
 3. `scripts/compare_runs.py` (rewritten) - Unified comparison tool
-4. `RUN_LOG.md` - Documentation of metadata structure
-
-**Key Insight:** Compute metrics from predictions.npy/targets.npy (always available) rather than relying on metadata format consistency.
-
 **Result:** Successfully extracted metrics from 18 complete runs, identified best performers and failure cases.
 
 ---
-
 ## CODE CHANGES SUMMARY
 
 ### Files Modified
@@ -170,7 +143,6 @@
 - Lines 409-413: Saved weights to metadata.json
 
 **Key Addition:**
-```python
 if args.loss_type == "weighted_edc" and hasattr(model.criterion, 'edt_weight'):
     model.criterion.edt_weight = args.edt_weight
     model.criterion.t20_weight = args.t20_weight
@@ -191,13 +163,9 @@ if args.loss_type == "weighted_edc" and hasattr(model.criterion, 'edt_weight'):
   - MSE loss clamping (max 1e4)
   - Loss component clamping
   - Inf checking and MSE fallback
-  - Normalized auxiliary as 0.5×(T20+C50)
 
 #### 3. `.gitignore` - Updated Ignore Patterns
 **Added:**
-```
-run1_conservative.log
-run2_moderate.log
 run3_aggressive.log
 ```
 
@@ -211,11 +179,7 @@ run3_aggressive.log
 
 #### 2. `scripts/sequential_train.sh` (Executable)
 - Launches 3 training runs one after another
-- Requires ~8GB free GPU memory (safe)
-- Each run: ~190 minutes
-- Total: ~570 minutes (~9.5 hours)
 
-#### 3. `scripts/check_gpu.py`
 - Checks GPU resources
 - Determines if parallel training feasible
 - Exit codes: 0 (feasible), 1 (tight), 2 (use sequential), 3 (no GPU)
@@ -229,9 +193,6 @@ run3_aggressive.log
 #### 5. `PARALLEL_TRAINING_PLAN.md`
 - Complete strategy documentation
 - Configuration details for 3 experiments
-- Execution instructions and troubleshooting
-
-#### 6. `scripts/README.md`
 - Reference guide for all scripts
 - Usage examples and workflow
 
@@ -251,10 +212,6 @@ run3_aggressive.log
 - Precision: 16-bit
 - Gradient clipping: 1.0
 - Epochs: 200 (full, no early stop)
-- Training time: 189.92 minutes (~3.2 hours)
-
-**Metrics:**
-```
 Overall EDC:  MAE=0.001160  RMSE=0.006630  R²=0.9946
 EDT Metrics:  MAE=0.004189  RMSE=0.006929  R²=0.9834 ✅
 T20 Metrics:  MAE=0.064688  RMSE=0.113695  R²=0.9503 ❌
