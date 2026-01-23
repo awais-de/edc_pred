@@ -161,11 +161,11 @@ def print_metrics(metrics: Dict[str, float]) -> None:
     print("EVALUATION METRICS")
     print("="*50)
     
-    # Overall metrics
+    # Overall metrics (check both 'mae' and 'edc_mae' for compatibility)
     print("\nOverall EDC Metrics:")
-    print(f"  MAE:  {metrics.get('mae', np.nan):.6f}")
-    print(f"  RMSE: {metrics.get('rmse', np.nan):.6f}")
-    print(f"  R²:   {metrics.get('r2', np.nan):.6f}")
+    print(f"  MAE:  {metrics.get('mae', metrics.get('edc_mae', np.nan)):.6f}")
+    print(f"  RMSE: {metrics.get('rmse', metrics.get('edc_rmse', np.nan)):.6f}")
+    print(f"  R²:   {metrics.get('r2', metrics.get('edc_r2', np.nan)):.6f}")
     
     # Acoustic metrics
     if "edt_mae" in metrics:
