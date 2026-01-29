@@ -7,6 +7,9 @@ data/.DS_Store
 /models/old/
 trained_models/
 
+# Inference output directories
+edc_plots/
+
 # Experiment result directories (with any timestamp)
 # These contain trained models and results - not needed in git
 experiments/lstm_*/

@@ -1,16 +1,33 @@
-flask
-torch
-pytorch-lightning
-numpy
-pandas
-scikit-learn
-matplotlib
-soundfile
-joblib
-tqdm
-tensorboard
-hydra-core
-omegaconf
-pyroomacoustics
-librosa
-scipy
+# Core Scientific Computing
+numpy>=2.0.0
+pandas>=2.0.0
+scipy>=1.10.0
+scikit-learn>=1.5.0
+
+# Deep Learning & Machine Learning
+torch>=2.0.0
+pytorch-lightning>=2.0.0
+torchmetrics>=1.0.0
+
+# Data Processing & Utilities
+joblib>=1.3.0
+tqdm>=4.50.0
+
+# Visualization
+matplotlib>=3.5.0
+tensorboard>=2.10.0
+
+# Audio Processing
+librosa>=0.10.0
+soundfile>=0.12.0
+pyroomacoustics>=0.9.0
+
+# Configuration Management
+hydra-core>=1.3.0
+omegaconf>=2.1.0
+
+# Web Framework (optional, if used)
+Flask>=3.0.0
+
+# System & Environment
+python-dateutil>=2.8.0
