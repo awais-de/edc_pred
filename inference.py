@@ -201,15 +201,15 @@ def main():
         epilog="""
 Examples:
   # Predict for a single room
-  python inference.py --checkpoint experiments/multihead_*/checkpoints/best_model.ckpt \\
+  python inference.py --checkpoint trained_models/multihead_*/checkpoints/best_model.ckpt \\
                       --features data/raw/roomFeaturesDataset.csv --index 0
   
   # Predict for multiple rooms
-  python inference.py --checkpoint experiments/multihead_*/checkpoints/best_model.ckpt \\
+  python inference.py --checkpoint trained_models/multihead_*/checkpoints/best_model.ckpt \\
                       --features data/raw/roomFeaturesDataset.csv --indices 0 1 2 3
   
   # Evaluate on test set
-  python inference.py --checkpoint experiments/multihead_*/checkpoints/best_model.ckpt \\
+  python inference.py --checkpoint trained_models/multihead_*/checkpoints/best_model.ckpt \\
                       --features data/raw/roomFeaturesDataset.csv \\
                       --edc-dir data/raw/EDC --evaluate
         """

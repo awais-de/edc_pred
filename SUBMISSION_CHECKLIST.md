@@ -54,7 +54,7 @@
   - [x] Room features CSV (6,000 samples × 16 features)
   - [x] EDC directory (6,000 .npy files)
 
-- [x] **Trained Model** (`experiments/multihead_20260123_120009/`)
+- [x] **Trained Model** (`trained_models/multihead_edc_baseline_v1_2026_01_23/`)
   - [x] Best checkpoint (`checkpoints/best_model.ckpt`)
   - [x] Training metadata (`metadata.json`)
   - [x] Prediction outputs (`.npy` files)
@@ -168,7 +168,7 @@ python evaluate.py \
 | `inference.py` | Inference API (NEW) | ✅ Production-ready |
 | `evaluate.py` | Evaluation & viz (NEW) | ✅ Complete analysis |
 | `requirements.txt` | Dependencies | ✅ All specified |
-| `experiments/multihead_20260123_120009/metadata.json` | Model info & results | ✅ All metrics |
+| `trained_models/multihead_edc_baseline_v1_2026_01_23/metadata.json` | Model info & results | ✅ All metrics |
 
 ---
 
@@ -350,7 +350,7 @@ Suggested structure:
 
 ### If evaluation fails:
 1. Ensure data files exist: `ls -la data/raw/EDC/ | head -5`
-2. Check metadata.json: `cat experiments/multihead_20260123_120009/metadata.json`
+2. Check metadata.json: `cat trained_models/multihead_edc_baseline_v1_2026_01_23/metadata.json`
 3. Review GPU memory: `nvidia-smi` (if using CUDA)
 4. Run on CPU instead: `--device cpu`
 

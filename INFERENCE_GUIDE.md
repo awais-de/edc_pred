@@ -11,7 +11,7 @@ Quick reference for using the EDC prediction model.
 pip install -r requirements.txt
 
 # 2. Verify model exists
-ls experiments/multihead_20260123_120009/checkpoints/best_model.ckpt
+ls trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt
 
 # 3. Run first inference
 python inference.py \
@@ -97,7 +97,7 @@ import pandas as pd
 
 # Initialize
 predictor = EDCPredictor(
-    checkpoint_path="experiments/multihead_20260123_120009/checkpoints/best_model.ckpt",
+    checkpoint_path="trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt",
     features_csv="data/raw/roomFeaturesDataset.csv"
 )
 
@@ -234,8 +234,8 @@ python inference.py ...
 ### "FileNotFoundError: checkpoint.ckpt"
 **Solution**: Verify checkpoint path
 ```bash
-# Check what experiments exist
-ls experiments/
+# Check what trained models exist
+ls trained_models/
 
 # Full path should be
 experiments/multihead_20260123_120009/checkpoints/best_model.ckpt

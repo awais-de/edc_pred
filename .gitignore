@@ -5,6 +5,7 @@ data/.DS_Store
 
 # Model directories
 /models/old/
+trained_models/
 
 # Experiment result directories (with any timestamp)
 # These contain trained models and results - not needed in git
@@ -51,12 +52,14 @@ build/
 *.swo
 *~
 
+# Markdown documentation (except README)
+*.md
+!README.md
+
 # Package version artifacts (unused)
 =0.4.1
 =0.17.1
 
 lstm_paper.pdf
-COMPARATIVE_ANALYSIS.md
-RESULTS_ANALYSIS.md
-experiments/multihead_20260123_120009.zip
-.DS_Store
+INFERENCE_GUIDE.md
+SUBMISSION_CHECKLIST.md
