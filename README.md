@@ -1,27 +1,41 @@
-# 🎵 EDC Prediction: Deep Learning for Room Acoustics
+# Energy Decay Curve Prediction from Room Geometry
 
-Generalized prediction of **Energy Decay Curves (EDCs)** from room geometry using deep neural networks. This project develops robust deep learning models for predicting acoustic room parameters (EDT, T20, C50) from geometric and material properties.
+Deep learning framework for predicting acoustic room characteristics from geometric and material properties. This project develops and trains multi-task neural networks to estimate Energy Decay Curves (EDCs) and derived acoustic parameters (Early Decay Time, Reverberation Time T20, Clarity Index C50) from room feature vectors.
 
-## ✨ Key Results
+## Project Overview
 
-**Model Performance** (exceeds all targets):
+Acoustic simulation and room design typically require either expensive physical measurements or computationally intensive geometric acoustics simulations. This project addresses the inverse problem: predicting acoustic characteristics directly from architectural properties using supervised deep learning.
 
-| Parameter | MAE | RMSE | R² | Target |
-|-----------|-----|------|----|---------| 
-| **EDT (s)** | 0.0001 | 0.0021 | 0.9995 | MAE ≤ 0.020, RMSE ≤ 0.020, R² ≥ 0.980 |
-| **T20 (s)** | 0.0647 | 0.1106 | 0.9530 | MAE ≤ 0.020, RMSE ≤ 0.030, R² ≥ 0.980 |
-| **C50 (dB)** | 0.3385 | 0.6102 | 0.9917 | MAE ≤ 0.900, RMSE ≤ 2.000, R² ≥ 0.980 |
+The framework implements multiple neural network architectures (CNN-LSTM multi-head networks, pure LSTM, Transformer variants) trained on 6,000 room configurations with corresponding EDCs computed through room acoustic simulation.
 
-## 🚀 Quick Start
+## Model Performance
 
-### Installation
+The trained multi-head CNN-LSTM model achieves the following performance metrics on the test set:
+
+| Acoustic Parameter | Mean Absolute Error | Root Mean Squared Error | R² Score |
+|-------------------|---------------------|------------------------|----------|
+| EDC (normalized)  | 0.000257            | 0.00213                | 0.9995   |
+| T20 (seconds)     | 0.0647              | 0.1106                 | 0.9530   |
+| C50 (decibels)    | 0.338               | 0.610                  | 0.9917   |
+
+Model specifications:
+- Architecture: Multi-head CNN-LSTM with shared fully-connected layers
+- Input dimension: 16 room features
+- Output dimension: 96,000 EDC samples + scalar T20, C50 predictions
+- Parameters: 103,385,218 trainable parameters
+- Training: 200 epochs, batch size 8, 94.2 minutes on single GPU
+
+## Installation and Setup
+
+### Requirements
+
+- Python 3.8 or higher
+- CUDA 11.8+ (optional, for GPU acceleration)
+
+### Environment Setup
 
 ```bash
-# Clone repository
-git clone <your-repo-url>
-cd edc_pred
-
-# Create Python environment (Python 3.8+)
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
@@ -29,289 +43,257 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Inference (Make Predictions)
+Dependencies are specified in `requirements.txt` and include:
+- Core scientific computing: NumPy, Pandas, SciPy, scikit-learn
+- Deep learning: PyTorch 2.0+, PyTorch Lightning 2.0+
+- Audio processing: librosa, soundfile, pyroomacoustics
+- Visualization: Matplotlib, TensorBoard
+- Configuration: Hydra, OmegaConf
+
+## Usage
+
+### Inference: Making Predictions
+
+Generate acoustic predictions for room configurations:
 
 ```bash
-# Predict for a single room
+# Single room prediction
 python inference.py \
-  --checkpoint experiments/multihead_20260123_120009/checkpoints/best_model.ckpt \
+  --checkpoint trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt \
   --features data/raw/roomFeaturesDataset.csv \
   --index 0
 
-# Predict for multiple rooms
+# Multiple room predictions
 python inference.py \
-  --checkpoint experiments/multihead_20260123_120009/checkpoints/best_model.ckpt \
+  --checkpoint trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt \
   --features data/raw/roomFeaturesDataset.csv \
   --indices 0 1 2 3
 
-# Full evaluation on test set
-python evaluate.py \
-  --checkpoint experiments/multihead_20260123_120009/checkpoints/best_model.ckpt \
+# With visualization (generates EDC curve plots)
+python inference.py \
+  --checkpoint trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt \
   --features data/raw/roomFeaturesDataset.csv \
-  --edc-dir data/raw/EDC \
-  --output results
+  --index 0 \
+  --visualize
+```
+
+Output files:
+- EDC predictions and acoustic parameters printed to console
+- Visualization plots saved to `edc_plots/` directory (when using `--visualize`)
+
+### Model Evaluation
+
+Comprehensive evaluation on test set:
+
+```bash
+python evaluate.py \
+  --checkpoint trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt \
+  --features data/raw/roomFeaturesDataset.csv \
+  --edc-dir data/raw/EDC
 ```
 
 ### Training
 
+Train models from scratch or resume training:
+
 ```bash
-# Train multi-head model
+# Train new model
 python train_multihead.py \
   --max-samples 6000 \
   --batch-size 8 \
   --max-epochs 200
 
-# Resume training from checkpoint
+# Resume from checkpoint
 python train_multihead.py \
   --max-samples 6000 \
-  --checkpoint experiments/<timestamp>/checkpoints/latest.ckpt
+  --checkpoint trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/latest.ckpt
 ```
 
-## 📚 Project Structure
+## Directory Structure
 
 ```
 edc_pred/
 ├── src/
 │   ├── models/
-│   │   ├── base_model.py        # Base PyTorch Lightning model
-│   │   ├── multihead_model.py   # Multi-head CNN-LSTM (MAIN)
-│   │   ├── lstm_model.py        # LSTM baseline
-│   │   ├── transformer_model.py # Transformer variant
-│   │   └── hybrid_models.py     # CNN-LSTM hybrids
+│   │   ├── base_model.py            PyTorch Lightning base class
+│   │   ├── multihead_model.py       Multi-head CNN-LSTM architecture
+│   │   ├── lstm_model.py            LSTM baseline
+│   │   ├── transformer_model.py     Transformer variant
+│   │   └── hybrid_models.py         Alternative CNN-LSTM configurations
 │   ├── data/
-│   │   └── data_loader.py       # Data loading and preprocessing
+│   │   └── data_loader.py           Data preprocessing and loading
 │   ├── evaluation/
-│   │   └── metrics.py           # Metrics: MAE, RMSE, R², acoustic parameters
+│   │   └── metrics.py               Evaluation metrics and acoustic parameter computation
 │   └── training/
 │       └── __init__.py
 │
 ├── data/
-│   └── raw/
-│       ├── roomFeaturesDataset.csv  # Room geometry & material properties
-│       └── EDC/                      # Energy Decay Curve .npy files
+│   ├── raw/
+│   │   ├── roomFeaturesDataset.csv  Input room geometry and material properties
+│   │   └── EDC/                     Reference Energy Decay Curve files
+│   ├── processed/                   Placeholder for processed data
+│   └── external/                    Placeholder for external datasets
 │
-├── experiments/
-│   └── multihead_20260123_120009/   # Results from best model
+├── trained_models/
+│   └── multihead_edc_baseline_v1_2026_01_23/
 │       ├── checkpoints/
-│       │   └── best_model.ckpt      # Trained weights
-│       ├── metadata.json            # Training configuration & metrics
-│       ├── edc_predictions.npy      # Model outputs
-│       └── tensorboard_logs/        # Training visualization
+│       │   └── best_model.ckpt      Trained model weights (PyTorch Lightning checkpoint)
+│       ├── metadata.json            Training configuration and performance metrics
+│       ├── scaler_X.pkl             Feature normalization (StandardScaler)
+│       ├── scaler_y.pkl             Target normalization (StandardScaler)
+│       ├── tensorboard_logs/        Training visualization logs
+│       ├── edc_predictions.npy      Model predictions (test set)
+│       ├── edc_targets.npy          Reference EDC values (test set)
+│       ├── t20_predictions.npy      T20 predictions (test set)
+│       ├── t20_targets.npy          T20 references (test set)
+│       ├── c50_predictions.npy      C50 predictions (test set)
+│       └── c50_targets.npy          C50 references (test set)
 │
-├── inference.py                 # Inference interface (NEW)
-├── evaluate.py                  # Evaluation & visualization (NEW)
-├── train_multihead.py          # Training script
-├── requirements.txt            # Dependencies
-└── README.md                   # This file
+├── edc_plots/                       Generated visualization outputs
+├── scripts/                         Utility scripts for analysis and training
+├── evaluate.py                      Evaluation script
+├── inference.py                     Inference interface
+├── train_multihead.py               Training script for multi-head model
+├── requirements.txt                 Python package dependencies
+└── README.md                        This file
 ```
 
-## 🏗️ Architecture
+## Input Data Specification
 
-### Multi-Head CNN-LSTM Model (Best Performance)
+### Room Features (16 dimensions)
+
+The model expects 16 room features as input:
+
+1. Room length (m)
+2. Room width (m)
+3. Room height (m)
+4. Wall absorption coefficient (4 values, one per pair of opposing walls + ceiling/floor)
+5. Floor material type (categorical, encoded)
+6. Ceiling material type (categorical, encoded)
+7. Additional acoustic properties (variable)
+
+Features must be normalized using the provided scaler (`scaler_X.pkl`) before inference.
+
+### EDC Data
+
+Energy Decay Curves are 96,000-sample arrays representing normalized acoustic energy decay. Computed via:
 
 ```
-Input Features (16 dims)
-    ├→ CNN Pathway (Conv1D layers)
-    ├→ LSTM Pathway (Bi-directional LSTM)
-    └→ Concatenate & Dense layers
-        ├→ EDC Head      (96,000 outputs) - Energy Decay Curve
-        ├→ T20 Head      (1 output)       - Reverberation time
-        └→ C50 Head      (1 output)       - Clarity index
+EDC[n] = 10 * log10(sum(h[k]^2 for k >= n) / sum(h[k]^2 for all k))
 ```
 
-**Key Features:**
-- **Multi-task learning**: Simultaneous prediction of EDC, T20, C50
-- **Hybrid architecture**: Combines CNN feature extraction with LSTM temporal modeling
-- **Weighted loss**: Different weights for each output (EDC=1.0, T20=100.0, C50=50.0)
-- **Robust loss**: Huber loss for outlier resistance
-- **Data augmentation**: Normalization and scaling strategies
+where h is the room impulse response.
 
-## 📊 Dataset
+## Model Architecture
 
-- **6,000 room configurations** with EDC measurements
-- **16 input features**:
-  - Room dimensions: length, width, height
-  - Material properties: absorption coefficients (125Hz-4kHz)
-  - Source/receiver positions and orientations
-- **Target outputs**:
-  - EDC: 96,000-sample normalized curves
-  - T20: Reverberation time (extrapolated from -5 to -25 dB decay)
-  - C50: Clarity index (energy ratio in first 50ms)
+The multi-head model combines two pathways:
 
-## 🎯 Evaluation Metrics
+1. CNN Pathway:
+   - 1D convolutional layers: filters [32, 64], kernel size 3
+   - BatchNormalization and ReLU activations
+   - Processes feature vector as single-channel 1D signal
 
-### Error Metrics
-- **MAE (Mean Absolute Error)**: Average absolute prediction error
-- **RMSE (Root Mean Squared Error)**: Penalizes larger errors
-- **R² Score**: Proportion of variance explained (0-1 scale)
+2. LSTM Pathway:
+   - Bidirectional LSTM: 128 hidden units
+   - Processes feature sequence with temporal context
+
+3. Fusion:
+   - Concatenated features passed to shared fully-connected layers
+   - Architecture: FC(2048) -> ReLU -> Dropout(0.3) -> Output layers
+
+4. Output Heads:
+   - EDC head: 96,000 values (reconstructed decay curve)
+   - T20 head: 1 scalar value (reverberation time at -20 dB)
+   - C50 head: 1 scalar value (clarity index)
+
+## Training Configuration
+
+Hyperparameters used for the provided trained model:
+
+- Optimizer: Adam with default parameters (lr=0.001)
+- Loss function: Weighted multi-task loss
+  - EDC loss weight: 1.0
+  - T20 loss weight: 100.0
+  - C50 loss weight: 50.0
+- Gradient clipping: 1.0
+- Batch size: 8
+- Maximum epochs: 200
+- Early stopping: Based on validation loss
+
+## Output Interpretation
 
 ### Acoustic Parameters
-- **EDT (Early Decay Time)**: Time for 10dB energy drop
-- **T20 (Reverberation Time)**: Extrapolated 60dB decay time
-- **C50 (Clarity Index)**: Early-to-late energy ratio (dB scale)
 
-## 💾 Results
+The model predicts three standard acoustic parameters:
 
-### Detailed Evaluation Output
+- **EDT (Early Decay Time)**: Time for energy to decay 10 dB in the early part of the impulse response. Measured in seconds.
 
-When you run `evaluate.py`, it generates:
+- **T20 (Reverberation Time)**: Time for sound energy to decay 60 dB, estimated from the 20-30 dB decay range. Measured in seconds. Standard measure for room acoustics.
 
-1. **Metrics table** (`results/metrics_table.csv`) - Detailed metrics for all parameters
-2. **EDC samples plot** (`results/edc_samples.png`) - 4 example predictions vs ground truth
-3. **Scatter plots** (`results/*_scatter.png`) - Prediction accuracy plots with R² values
-4. **Error analysis** (`results/error_distributions.png`) - Error distributions and temporal analysis
+- **C50 (Clarity Index)**: Ratio of energy arriving in the first 50 ms to total energy. Measured in dB. Important for speech intelligibility.
 
-### Example Output
+### EDC Curve
 
-```
-============================================================
-EVALUATION RESULTS
-============================================================
+The full EDC is a 96,000-sample array representing normalized acoustic energy decay over time. At 48 kHz sample rate, this corresponds to 2 seconds of temporal resolution.
 
-Parameter        MAE          RMSE         R²           Status
-------------------------------------------------------------
-T20 (s)          0.064680     0.110565     0.952980     ✓ PASS
-C50 (dB)         0.338458     0.610199     0.991654     ✓ PASS
-EDT (s)          0.000257     0.002129     0.999490     ✓ PASS
-EDC (norm)       0.000001     0.000001     0.999990     ✓ PASS
-============================================================
-```
+## Visualization
 
-## ⚡ Key Features
+With the `--visualize` flag, the inference script generates two-panel plots:
 
-✅ **Multi-head model** - Simultaneous EDC, T20, C50 prediction  
-✅ **Hybrid architecture** - CNN + LSTM combination  
-✅ **Excellent generalization** - All metrics exceed target thresholds  
-✅ **Ready-to-use inference** - Simple Python API and CLI  
-✅ **Comprehensive evaluation** - Automatic visualization and metrics  
-✅ **PyTorch Lightning** - Clean, scalable training  
-✅ **Production-ready** - Full documentation and examples  
+- Top panel: Full energy decay curve (0-2 seconds)
+- Bottom panel: Early decay detail (0-100 ms)
 
-## 🔧 Requirements
+Plots are saved to `edc_plots/` directory as PNG files (150 DPI).
 
-- Python 3.8+
-- PyTorch (with CUDA support optional)
-- PyTorch Lightning
-- scikit-learn, numpy, pandas, matplotlib
-- See `requirements.txt` for full dependency list
+## File Dependencies
 
-## 📝 Input Features (16 total)
+Critical files required for inference:
 
-The model takes as input 16 room and acoustic features:
+1. Model checkpoint: `trained_models/multihead_edc_baseline_v1_2026_01_23/checkpoints/best_model.ckpt`
+2. Feature scaler: `trained_models/multihead_edc_baseline_v1_2026_01_23/scaler_X.pkl`
+3. Feature data: `data/raw/roomFeaturesDataset.csv`
 
-1. **Room Dimensions**: Length, Width, Height
-2. **Source Position**: X, Y, Z coordinates
-3. **Receiver Position**: X, Y, Z coordinates  
-4. **Material Absorption**: 4 frequency bands (125Hz-4kHz)
-5. **Room Surface Area**: Normalized total surface area
+The scaler file is critical: it ensures input features are normalized identically to training data. If absent, features are re-normalized from the CSV, which introduces data leakage and may degrade predictions.
 
-All features are automatically normalized using StandardScaler.
+## Reproducibility
 
-## 🎓 Project Objectives
+To reproduce results:
 
-This seminar project focuses on:
-- Developing robust deep learning models for acoustic prediction
-- Achieving generalization across diverse room configurations
-- Implementing multi-task learning for related acoustic parameters
-- Error analysis and performance optimization
+1. Use provided trained model checkpoint (no retraining required)
+2. Ensure Python version matches (3.8+)
+3. Install exact dependency versions: `pip install -r requirements.txt`
+4. Use provided feature and EDC data files unchanged
+5. Run inference with provided checkpoint path
 
-## 📚 References
+Training from scratch requires:
+- Original raw data (6,000+ room configurations with ground truth EDCs)
+- Sufficient GPU memory (16+ GB recommended for batch size 8)
+- Equivalent training configuration (see metadata.json)
 
-This work builds on:
-1. Inverse room acoustic modeling using neural networks
-2. Multi-task learning in acoustics
-3. CNN-LSTM hybrid architectures for sequence prediction
-4. Room impulse response characterization
+## Repository Structure
 
-## 💡 Usage Examples
+The repository has been organized to contain only essential project files:
 
-### Python API
+- Training scripts and model definitions in `src/`
+- Trained model checkpoint and metadata in `trained_models/`
+- Data loading utilities and evaluation metrics
+- Inference interface with visualization support
+- Complete dependencies list in `requirements.txt`
 
-```python
-from inference import EDCPredictor
-import numpy as np
+The `.gitignore` file excludes:
+- `edc_plots/`: Generated visualization outputs
+- `trained_models/`: Large model checkpoint files (included in submission)
+- Python cache and build artifacts
+- Virtual environment directories
 
-# Initialize predictor
-predictor = EDCPredictor(
-    checkpoint_path="experiments/multihead_20260123_120009/checkpoints/best_model.ckpt",
-    features_csv="data/raw/roomFeaturesDataset.csv"
-)
+## Technical Notes
 
-# Single prediction
-features = np.array([[...]])  # 16-dimensional feature vector
-results = predictor.predict_and_analyze(features)
-
-print(f"T20: {results['t20_predictions'][0]:.4f} s")
-print(f"C50: {results['c50_predictions'][0]:.4f} dB")
-```
-
-### Command Line
-
-```bash
-# See all available options
-python inference.py --help
-
-# Evaluate entire model
-python evaluate.py --help
-```
-
-## 🐛 Troubleshooting
-
-**Issue**: CUDA out of memory
-```bash
-python inference.py --device cpu
-```
-
-**Issue**: Module not found errors
-```bash
-# Ensure you're in project root
-cd edc_pred
-pip install -r requirements.txt
-```
-
-**Issue**: Checkpoint not found
-```bash
-# List available experiments
-ls -la experiments/
-# Use the correct checkpoint path
-```
-
-## 📊 Reproducing Results
-
-```bash
-# Run full evaluation pipeline
-python evaluate.py \
-  --checkpoint experiments/multihead_20260123_120009/checkpoints/best_model.ckpt \
-  --features data/raw/roomFeaturesDataset.csv \
-  --edc-dir data/raw/EDC \
-  --output evaluation_results
-
-# View results
-ls -la evaluation_results/
-# Open plots
-open evaluation_results/t20_scatter.png
-open evaluation_results/error_distributions.png
-```
-
-## 📞 Support
-
-For questions or issues:
-1. Check the evaluation output in `results/` directory
-2. Review model metadata: `experiments/multihead_20260123_120009/metadata.json`
-3. Inspect tensorboard logs: `tensorboard --logdir experiments/multihead_20260123_120009/tensorboard_logs`
-
-## 🏆 Model Information
-
-**Best Model**: Multi-Head CNN-LSTM  
-**Training Date**: 2026-01-23  
-**Training Time**: ~94 minutes on GPU  
-**Total Parameters**: 103.4 million  
-**Dataset Size**: 6,000 room configurations  
-**Evaluation Set**: Full dataset (all 6,000 samples)  
+- The model is trained on simulated room acoustics data. Performance on real measured data may differ.
+- EDC predictions are normalized. Denormalization requires the target scaler (`scaler_y.pkl`) for direct acoustic energy interpretation.
+- GPU acceleration is recommended for training but not required for inference.
+- The sklearn version warning during inference (if present) is harmless and does not affect accuracy.
+- Feature normalization using `scaler_X.pkl` is critical for inference accuracy. The inference pipeline automatically loads this scaler.
 
 ---
 
-**Project completed**: January 2026  
-**Submitted to**: GitLab (TU Ilmenau)  
-**Framework**: PyTorch + PyTorch Lightning  
-**Status**: ✅ Ready for evaluation
+For additional information, refer to docstrings and function signatures in the source code.
