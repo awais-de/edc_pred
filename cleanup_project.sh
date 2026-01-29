@@ -86,9 +86,7 @@ SHIPPING_COMPLETE_AUDIT.md
 SHIPPING_FILES_CHECKLIST.md
 SHIPPING_DOCUMENTATION_INDEX.md
 CLEANUP_SCRIPT_DOCUMENTATION.md
-scripts/plot_results.py
-scripts/compare_runs.py
-scripts/README.md
+scripts
 cleanup_project.sh
 EOF
 
@@ -175,10 +173,11 @@ echo ""
 echo -e "${BLUE}Scanning for files to move...${NC}"
 echo ""
 
-# Build a list of files to move
+# Build a list of files to move (top-level items only)
 FILES_TO_MOVE=()
 
 # Walk through project directory (exclude .venv from find to speed up scanning)
+# Only process mindepth 1 and maxdepth 1 to get top-level items only
 while IFS= read -r -d '' file; do
     # Get relative path
     rel_path="${file#$PROJECT_ROOT/}"
@@ -209,9 +208,9 @@ while IFS= read -r -d '' file; do
     if ! $is_whitelisted; then
         FILES_TO_MOVE+=("$rel_path")
     fi
-done < <(find "$PROJECT_ROOT" -mindepth 1 ! -path "*/.venv/*" ! -path "*/.git/*" -print0)
+done < <(find "$PROJECT_ROOT" -mindepth 1 -maxdepth 1 ! -name ".venv" ! -name ".git" -print0)
 
-# Note: Sorting is skipped for better performance with large directories
+# Note: Only top-level items are listed to avoid moving nested items twice
 
 if [ ${#FILES_TO_MOVE[@]} -eq 0 ]; then
     echo -e "${YELLOW}⚠ No files need to be moved.${NC}"
