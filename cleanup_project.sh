@@ -64,7 +64,7 @@ read -r -d '' WHITELIST << 'EOF' || true
 requirements.txt
 train_multihead.py
 src
-data/raw/roomFeaturesDataset.csv
+data
 .git
 .gitignore
 .venv
@@ -177,7 +177,7 @@ echo ""
 # Build a list of files to move
 FILES_TO_MOVE=()
 
-# Walk through project directory
+# Walk through project directory (exclude .venv from find to speed up scanning)
 while IFS= read -r -d '' file; do
     # Get relative path
     rel_path="${file#$PROJECT_ROOT/}"
@@ -208,11 +208,9 @@ while IFS= read -r -d '' file; do
     if ! $is_whitelisted; then
         FILES_TO_MOVE+=("$rel_path")
     fi
-done < <(find "$PROJECT_ROOT" -mindepth 1 -print0)
+done < <(find "$PROJECT_ROOT" -mindepth 1 ! -path "*/.venv/*" ! -path "*/.git/*" -print0)
 
-# Sort the list for readability
-IFS=$'\n' FILES_TO_MOVE=($(sort <<<"${FILES_TO_MOVE[*]}"))
-unset IFS
+# Note: Sorting is skipped for better performance with large directories
 
 if [ ${#FILES_TO_MOVE[@]} -eq 0 ]; then
     echo -e "${YELLOW}⚠ No files need to be moved.${NC}"
