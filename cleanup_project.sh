@@ -68,6 +68,7 @@ data
 .git
 .gitignore
 .venv
+venv
 README.md
 CONVERSATION_CONTEXT.md
 RESULTS_ANALYSIS.md
