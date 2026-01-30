@@ -50,6 +50,27 @@ Dependencies are specified in `requirements.txt` and include:
 - Visualization: Matplotlib, TensorBoard
 - Configuration: Hydra, OmegaConf
 
+### Data and Model Downloads
+
+Before running inference or training, download the required datasets and trained model:
+
+1. **Room Features Dataset and Reference EDCs**
+   - Source: Zenodo
+   - URL: https://zenodo.org/records/17210197
+   - Contents: `roomFeaturesDataset.csv` and EDC reference files
+   - Extract to: `data/raw/`
+
+2. **Pre-trained Multi-head Model**
+   - Source: TU Ilmenau SharePoint
+   - URL: https://tuilmenau365-my.sharepoint.com/:u:/g/personal/m_awais_tu-ilmenau_de/IQAOtapPee_oRIy7-nLVouv6AQENaPqAiRMJS90cuvWLfCc?e=YHBc2g
+   - Contents: Trained checkpoint, scalers, metadata, and predictions
+   - Extract to: `trained_models/`
+
+These downloads are required for:
+- Running inference with the pre-trained model
+- Evaluating the model on the test set
+- Training new models (requires the dataset)
+
 ## Usage
 
 ### Inference: Making Predictions
